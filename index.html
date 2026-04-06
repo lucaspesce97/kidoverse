@@ -1,0 +1,1740 @@
+import { useState, useEffect, useRef, useCallback } from "react";
+
+// ═══════════════════════════════════════════════════
+// KIDOVERSE — Full Interactive Platform with Playable Games
+// ═══════════════════════════════════════════════════
+
+const C = {
+  cream: "#FBF8F3", sand: "#F5F0E8", sage: "#A8B5A0", sageDark: "#7A8F6F",
+  coral: "#E8836B", coralLight: "#FDEBE6", navy: "#2C3E50",
+  charcoal: "#3D3D3D", muted: "#8E8E8E", gold: "#D4A853",
+  lavender: "#C4B5D4", lavenderLight: "#F0ECF5",
+  sky: "#A8D8EA", skyLight: "#EAF5FA",
+  mint: "#B8E0D2", mintLight: "#E8F6F0",
+};
+
+// ═══ GAME 1: PATTERNQUEST ═══
+function PatternQuest({ onBack }) {
+  const [level, setLevel] = useState(1);
+  const [score, setScore] = useState(0);
+  const [lives, setLives] = useState(3);
+  const [sequence, setSequence] = useState([]);
+  const [options, setOptions] = useState([]);
+  const [answer, setAnswer] = useState(null);
+  const [feedback, setFeedback] = useState(null);
+  const [gameOver, setGameOver] = useState(false);
+  const [streak, setStreak] = useState(0);
+
+  const shapes = ["🔴", "🔵", "🟡", "🟢", "🟣", "🟠", "⭐", "💎", "🌙", "❤️"];
+
+  const generatePuzzle = useCallback((lvl) => {
+    const patternLen = Math.min(2 + Math.floor(lvl / 3), 5);
+    const pool = shapes.slice(0, Math.min(4 + lvl, shapes.length));
+    const pattern = [];
+    for (let i = 0; i < patternLen; i++) {
+      pattern.push(pool[Math.floor(Math.random() * pool.length)]);
+    }
+    const repeated = [...pattern, ...pattern, ...pattern.slice(0, 1 + Math.floor(lvl / 2))];
+    const missingIdx = repeated.length - 1;
+    const correct = repeated[missingIdx];
+    repeated[missingIdx] = "❓";
+
+    const wrongOptions = pool.filter(s => s !== correct).sort(() => Math.random() - 0.5).slice(0, 3);
+    const allOptions = [correct, ...wrongOptions].sort(() => Math.random() - 0.5);
+
+    setSequence(repeated);
+    setOptions(allOptions);
+    setAnswer(correct);
+    setFeedback(null);
+  }, []);
+
+  useEffect(() => { generatePuzzle(level); }, [level, generatePuzzle]);
+
+  const handleChoice = (choice) => {
+    if (feedback) return;
+    if (choice === answer) {
+      setFeedback("correct");
+      setScore(s => s + (10 * level) + (streak * 5));
+      setStreak(s => s + 1);
+      setTimeout(() => setLevel(l => l + 1), 900);
+    } else {
+      setFeedback("wrong");
+      setStreak(0);
+      const newLives = lives - 1;
+      setLives(newLives);
+      if (newLives <= 0) {
+        setTimeout(() => setGameOver(true), 900);
+      } else {
+        setTimeout(() => generatePuzzle(level), 900);
+      }
+    }
+  };
+
+  if (gameOver) {
+    return (
+      <GameShell onBack={onBack} title="PatternQuest" color={C.skyLight} accent="#5BA4C9">
+        <div style={{ textAlign: "center", padding: "40px 20px" }}>
+          <div style={{ fontSize: 64, marginBottom: 16 }}>🎯</div>
+          <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: 32, color: C.navy, marginBottom: 8 }}>¡Buen juego!</h2>
+          <p style={{ fontSize: 48, fontWeight: 800, color: C.coral, fontFamily: "'Playfair Display', serif" }}>{score} pts</p>
+          <p style={{ fontSize: 16, color: C.muted, margin: "8px 0 32px" }}>Llegaste al nivel {level}</p>
+          <button onClick={() => { setLevel(1); setScore(0); setLives(3); setStreak(0); setGameOver(false); }}
+            style={{ ...btnStyle, background: "#5BA4C9" }}>Jugar de Nuevo</button>
+        </div>
+      </GameShell>
+    );
+  }
+
+  return (
+    <GameShell onBack={onBack} title="PatternQuest" color={C.skyLight} accent="#5BA4C9"
+      topBar={<>
+        <Stat label="Nivel" value={level} />
+        <Stat label="Puntos" value={score} />
+        <Stat label="Vidas" value={"❤️".repeat(lives)} />
+        {streak > 1 && <Stat label="Racha" value={`🔥${streak}`} />}
+      </>}
+    >
+      <p style={{ textAlign: "center", fontSize: 15, color: C.muted, marginBottom: 20 }}>
+        Encuentra el patrón y elige la pieza que falta
+      </p>
+      <div style={{
+        display: "flex", flexWrap: "wrap", justifyContent: "center", gap: 8,
+        padding: 20, background: "#fff", borderRadius: 20,
+        boxShadow: "0 2px 16px rgba(0,0,0,0.04)", marginBottom: 28, minHeight: 80,
+      }}>
+        {sequence.map((s, i) => (
+          <div key={i} style={{
+            width: 52, height: 52, borderRadius: 14,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: s === "❓" ? 28 : 26,
+            background: s === "❓" ? `${C.coral}20` : C.sand,
+            border: s === "❓" ? `2px dashed ${C.coral}` : "2px solid transparent",
+            animation: s === "❓" ? "pulse 1.5s ease infinite" : "none",
+            transition: "all 0.3s",
+          }}>{s}</div>
+        ))}
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12, maxWidth: 300, margin: "0 auto" }}>
+        {options.map((opt, i) => (
+          <button key={i} onClick={() => handleChoice(opt)}
+            disabled={!!feedback}
+            style={{
+              padding: 16, borderRadius: 16, border: "none", fontSize: 32,
+              cursor: feedback ? "default" : "pointer",
+              background: feedback && opt === answer ? "#d4edda" :
+                         feedback === "wrong" && opt !== answer ? C.sand : "#fff",
+              boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
+              transform: feedback && opt === answer ? "scale(1.1)" : "scale(1)",
+              transition: "all 0.3s",
+              opacity: feedback && opt !== answer ? 0.4 : 1,
+            }}>{opt}</button>
+        ))}
+      </div>
+      {feedback && (
+        <div style={{
+          textAlign: "center", marginTop: 20, fontSize: 22, fontWeight: 700,
+          color: feedback === "correct" ? "#28a745" : C.coral,
+          animation: "fadeInUp 0.3s ease",
+        }}>
+          {feedback === "correct" ? "🎉 ¡Correcto!" : "😅 ¡Casi! Intenta de nuevo"}
+        </div>
+      )}
+    </GameShell>
+  );
+}
+
+// ═══ GAME 2: SAFARI MOVES ═══
+function SafariMoves({ onBack }) {
+  const animals = [
+    { emoji: "🐸", name: "Rana", action: "¡Salta como una rana!", duration: 8, points: 15 },
+    { emoji: "🦒", name: "Jirafa", action: "¡Estírate muuucho como una jirafa!", duration: 10, points: 20 },
+    { emoji: "🐻", name: "Oso", action: "¡Camina en 4 patas como un oso!", duration: 10, points: 20 },
+    { emoji: "🦅", name: "Águila", action: "¡Extiende los brazos y vuela!", duration: 8, points: 15 },
+    { emoji: "🐍", name: "Serpiente", action: "¡Deslízate por el suelo como serpiente!", duration: 12, points: 25 },
+    { emoji: "🐒", name: "Mono", action: "¡Salta y mueve los brazos como mono!", duration: 10, points: 20 },
+    { emoji: "🦀", name: "Cangrejo", action: "¡Camina de lado como un cangrejo!", duration: 10, points: 20 },
+    { emoji: "🐧", name: "Pingüino", action: "¡Camina con los pies juntos!", duration: 8, points: 15 },
+  ];
+
+  const [phase, setPhase] = useState("ready"); // ready, active, rest, done
+  const [current, setCurrent] = useState(0);
+  const [timer, setTimer] = useState(0);
+  const [score, setScore] = useState(0);
+  const [round, setRound] = useState(0);
+  const [order, setOrder] = useState([]);
+  const maxRounds = 5;
+
+  useEffect(() => {
+    const shuffled = [...Array(animals.length).keys()].sort(() => Math.random() - 0.5);
+    setOrder(shuffled.slice(0, maxRounds));
+  }, []);
+
+  useEffect(() => {
+    if (phase !== "active" && phase !== "rest") return;
+    if (timer <= 0) {
+      if (phase === "active") {
+        setScore(s => s + animals[order[round]].points);
+        if (round + 1 >= maxRounds) {
+          setPhase("done");
+        } else {
+          setPhase("rest");
+          setTimer(3);
+        }
+      } else if (phase === "rest") {
+        setRound(r => r + 1);
+        setPhase("active");
+        setTimer(animals[order[round + 1]]?.duration || 8);
+      }
+      return;
+    }
+    const interval = setInterval(() => setTimer(t => t - 1), 1000);
+    return () => clearInterval(interval);
+  }, [timer, phase, round, order]);
+
+  const startGame = () => {
+    setPhase("active");
+    setTimer(animals[order[0]].duration);
+    setRound(0);
+    setScore(0);
+  };
+
+  const animal = order[round] !== undefined ? animals[order[round]] : null;
+  const progress = phase === "active" && animal ? ((animal.duration - timer) / animal.duration) * 100 : 0;
+
+  if (phase === "done") {
+    const stars = score >= 80 ? 3 : score >= 50 ? 2 : 1;
+    return (
+      <GameShell onBack={onBack} title="Safari Moves" color={C.mintLight} accent="#5DB89A">
+        <div style={{ textAlign: "center", padding: "40px 20px" }}>
+          <div style={{ fontSize: 64, marginBottom: 8 }}>🏆</div>
+          <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: 28, color: C.navy, marginBottom: 8 }}>¡Safari Completado!</h2>
+          <div style={{ fontSize: 40, marginBottom: 16 }}>{"⭐".repeat(stars)}{"☆".repeat(3 - stars)}</div>
+          <p style={{ fontSize: 42, fontWeight: 800, color: "#5DB89A", fontFamily: "'Playfair Display', serif" }}>{score} pts</p>
+          <p style={{ fontSize: 15, color: C.muted, margin: "12px 0 32px" }}>Imitaste {maxRounds} animales</p>
+          <button onClick={() => { setPhase("ready"); setScore(0); setRound(0); setOrder([...Array(animals.length).keys()].sort(() => Math.random() - 0.5).slice(0, maxRounds)); }}
+            style={{ ...btnStyle, background: "#5DB89A" }}>Jugar de Nuevo</button>
+        </div>
+      </GameShell>
+    );
+  }
+
+  return (
+    <GameShell onBack={onBack} title="Safari Moves" color={C.mintLight} accent="#5DB89A"
+      topBar={phase !== "ready" ? <>
+        <Stat label="Puntos" value={score} />
+        <Stat label="Animal" value={`${round + 1}/${maxRounds}`} />
+      </> : null}
+    >
+      {phase === "ready" && (
+        <div style={{ textAlign: "center", padding: "30px 20px" }}>
+          <div style={{ fontSize: 72, marginBottom: 16, animation: "float 3s ease infinite" }}>🦁</div>
+          <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: 28, color: C.navy, marginBottom: 12 }}>¡Bienvenido al Safari!</h2>
+          <p style={{ fontSize: 16, color: C.muted, lineHeight: 1.7, marginBottom: 32, maxWidth: 340, margin: "0 auto 32px" }}>
+            Aparecerá un animal y deberás imitar su movimiento. ¡Muévete, salta y diviértete!
+          </p>
+          <button onClick={startGame} style={{ ...btnStyle, background: "#5DB89A", fontSize: 18, padding: "16px 48px" }}>
+            🐾 ¡Comenzar Safari!
+          </button>
+        </div>
+      )}
+
+      {phase === "active" && animal && (
+        <div style={{ textAlign: "center", padding: "20px" }}>
+          <div style={{
+            fontSize: 100, marginBottom: 16,
+            animation: "pulse 0.8s ease infinite",
+            filter: "drop-shadow(0 8px 24px rgba(0,0,0,0.1))",
+          }}>{animal.emoji}</div>
+          <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: 26, color: C.navy, marginBottom: 8 }}>{animal.name}</h2>
+          <p style={{ fontSize: 20, color: "#5DB89A", fontWeight: 700, marginBottom: 24 }}>{animal.action}</p>
+          
+          {/* Timer circle */}
+          <div style={{ position: "relative", width: 100, height: 100, margin: "0 auto 16px" }}>
+            <svg width="100" height="100" style={{ transform: "rotate(-90deg)" }}>
+              <circle cx="50" cy="50" r="44" fill="none" stroke={C.sand} strokeWidth="8" />
+              <circle cx="50" cy="50" r="44" fill="none" stroke="#5DB89A" strokeWidth="8"
+                strokeDasharray={`${2 * Math.PI * 44}`}
+                strokeDashoffset={`${2 * Math.PI * 44 * (1 - progress / 100)}`}
+                strokeLinecap="round" style={{ transition: "stroke-dashoffset 1s linear" }} />
+            </svg>
+            <span style={{
+              position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)",
+              fontSize: 32, fontWeight: 800, color: C.navy,
+            }}>{timer}</span>
+          </div>
+          <p style={{ fontSize: 13, color: C.muted }}>+{animal.points} puntos</p>
+        </div>
+      )}
+
+      {phase === "rest" && (
+        <div style={{ textAlign: "center", padding: "40px 20px" }}>
+          <div style={{ fontSize: 56, marginBottom: 16 }}>😮‍💨</div>
+          <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: 28, color: C.navy, marginBottom: 8 }}>¡Descansa!</h2>
+          <p style={{ fontSize: 48, fontWeight: 800, color: C.coral }}>{timer}</p>
+          <p style={{ fontSize: 15, color: C.muted, marginTop: 8 }}>Siguiente animal en...</p>
+        </div>
+      )}
+    </GameShell>
+  );
+}
+
+// ═══ GAME 3: NUMEROBOT ═══
+function NumeroBot({ onBack }) {
+  const [level, setLevel] = useState(1);
+  const [score, setScore] = useState(0);
+  const [problem, setProblem] = useState(null);
+  const [options, setOptions] = useState([]);
+  const [feedback, setFeedback] = useState(null);
+  const [lives, setLives] = useState(3);
+  const [gameOver, setGameOver] = useState(false);
+  const [botMood, setBotMood] = useState("🤖");
+
+  const contexts = [
+    (a, b) => `Si tienes ${a} manzanas 🍎 y te dan ${b} más, ¿cuántas tienes?`,
+    (a, b) => `Hay ${a} pájaros 🐦 en un árbol y llegan ${b} más. ¿Cuántos hay?`,
+    (a, b) => `Tienes ${a} galletas 🍪 y compartes ${Math.min(a, b)} con tu amigo. ¿Cuántas te quedan?`,
+    (a, b) => `En la fiesta hay ${a} globos 🎈 y se revientan ${Math.min(a, b)}. ¿Cuántos quedan?`,
+    (a, b) => `Si cada niño necesita ${b} crayones 🖍️ y hay ${a} niños, ¿cuántos crayones se necesitan?`,
+  ];
+
+  const generateProblem = useCallback((lvl) => {
+    const maxNum = Math.min(5 + lvl * 2, 20);
+    const a = Math.floor(Math.random() * maxNum) + 1;
+    const b = Math.floor(Math.random() * Math.min(maxNum, 10)) + 1;
+    
+    let contextIdx, answer;
+    if (lvl <= 3) {
+      contextIdx = Math.floor(Math.random() * 2);
+      answer = a + b;
+    } else if (lvl <= 6) {
+      contextIdx = 2 + Math.floor(Math.random() * 2);
+      answer = contextIdx === 2 ? a - Math.min(a, b) : a - Math.min(a, b);
+    } else {
+      contextIdx = 4;
+      const smallA = Math.min(a, 5);
+      const smallB = Math.min(b, 4);
+      answer = smallA * smallB;
+    }
+
+    const text = contexts[contextIdx](a, b);
+    if (contextIdx >= 2 && contextIdx <= 3) {
+      const sub = Math.min(a, b);
+      answer = a - sub;
+    }
+    if (contextIdx === 4) {
+      answer = a * b;
+    }
+
+    const wrong = new Set();
+    while (wrong.size < 3) {
+      const offset = Math.floor(Math.random() * 5) + 1;
+      const w = Math.random() > 0.5 ? answer + offset : Math.max(0, answer - offset);
+      if (w !== answer) wrong.add(w);
+    }
+    const allOpts = [answer, ...wrong].sort(() => Math.random() - 0.5);
+    
+    setProblem({ text, answer });
+    setOptions(allOpts);
+    setFeedback(null);
+    setBotMood("🤖");
+  }, []);
+
+  useEffect(() => { generateProblem(level); }, [level, generateProblem]);
+
+  const handleChoice = (choice) => {
+    if (feedback) return;
+    if (choice === problem.answer) {
+      setFeedback("correct");
+      setBotMood("🥳");
+      setScore(s => s + level * 15);
+      setTimeout(() => setLevel(l => l + 1), 1000);
+    } else {
+      setFeedback("wrong");
+      setBotMood("😢");
+      const nl = lives - 1;
+      setLives(nl);
+      if (nl <= 0) setTimeout(() => setGameOver(true), 1000);
+      else setTimeout(() => generateProblem(level), 1000);
+    }
+  };
+
+  if (gameOver) {
+    return (
+      <GameShell onBack={onBack} title="NumeroBot" color={C.coralLight} accent={C.coral}>
+        <div style={{ textAlign: "center", padding: "40px 20px" }}>
+          <div style={{ fontSize: 64, marginBottom: 16 }}>🤖</div>
+          <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: 28, color: C.navy, marginBottom: 8 }}>¡Gran trabajo, campeón!</h2>
+          <p style={{ fontSize: 48, fontWeight: 800, color: C.coral, fontFamily: "'Playfair Display', serif" }}>{score} pts</p>
+          <p style={{ fontSize: 16, color: C.muted, margin: "8px 0 32px" }}>Nivel alcanzado: {level}</p>
+          <button onClick={() => { setLevel(1); setScore(0); setLives(3); setGameOver(false); }}
+            style={{ ...btnStyle, background: C.coral }}>Jugar de Nuevo</button>
+        </div>
+      </GameShell>
+    );
+  }
+
+  return (
+    <GameShell onBack={onBack} title="NumeroBot" color={C.coralLight} accent={C.coral}
+      topBar={<><Stat label="Nivel" value={level} /><Stat label="Puntos" value={score} /><Stat label="Vidas" value={"❤️".repeat(lives)} /></>}
+    >
+      <div style={{ textAlign: "center", padding: "10px 20px" }}>
+        <div style={{ fontSize: 72, marginBottom: 12, transition: "all 0.3s" }}>{botMood}</div>
+        <div style={{
+          background: "#fff", borderRadius: 20, padding: 24, marginBottom: 24,
+          boxShadow: "0 2px 16px rgba(0,0,0,0.04)", position: "relative",
+        }}>
+          <div style={{
+            position: "absolute", top: -10, left: "50%", transform: "translateX(-50%)",
+            width: 20, height: 20, background: "#fff", borderRadius: 4,
+            transform: "translateX(-50%) rotate(45deg)", boxShadow: "-2px -2px 4px rgba(0,0,0,0.02)",
+          }} />
+          <p style={{ fontSize: 18, color: C.navy, lineHeight: 1.6, fontWeight: 500 }}>
+            {problem?.text}
+          </p>
+        </div>
+        
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12, maxWidth: 280, margin: "0 auto" }}>
+          {options.map((opt, i) => (
+            <button key={i} onClick={() => handleChoice(opt)} disabled={!!feedback}
+              style={{
+                padding: "18px 12px", borderRadius: 16, border: "none",
+                fontSize: 28, fontWeight: 800, cursor: feedback ? "default" : "pointer",
+                fontFamily: "'Playfair Display', serif",
+                background: feedback && opt === problem.answer ? "#d4edda" :
+                           feedback === "wrong" && opt !== problem.answer ? C.sand : "#fff",
+                color: C.navy, boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
+                transform: feedback && opt === problem.answer ? "scale(1.1)" : "scale(1)",
+                transition: "all 0.3s",
+                opacity: feedback && opt !== problem.answer && feedback === "wrong" ? 0.4 : 1,
+              }}>{opt}</button>
+          ))}
+        </div>
+        {feedback && (
+          <p style={{
+            marginTop: 16, fontSize: 20, fontWeight: 700,
+            color: feedback === "correct" ? "#28a745" : C.coral,
+            animation: "fadeInUp 0.3s ease",
+          }}>
+            {feedback === "correct" ? "🎉 ¡Perfecto!" : `La respuesta era ${problem.answer}`}
+          </p>
+        )}
+      </div>
+    </GameShell>
+  );
+}
+
+// ═══ GAME 4: DREAMPAINT ═══
+function DreamPaint({ onBack }) {
+  const canvasRef = useRef(null);
+  const [drawing, setDrawing] = useState(false);
+  const [color, setColor] = useState("#E8836B");
+  const [brushSize, setBrushSize] = useState(6);
+  const [tool, setTool] = useState("brush");
+  const lastPos = useRef(null);
+  const [stickers, setStickers] = useState([]);
+
+  const colors = ["#E8836B", "#5BA4C9", "#5DB89A", "#D4A853", "#9B7FC4", "#2C3E50", "#FF6B9D", "#FFD93D", "#fff", "#3D3D3D"];
+  const stickerOptions = ["⭐", "🌈", "🦋", "🌸", "🎵", "💫", "🌺", "🍄", "☁️", "🌙"];
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    canvas.width = canvas.offsetWidth * 2;
+    canvas.height = canvas.offsetHeight * 2;
+    ctx.scale(2, 2);
+    ctx.fillStyle = "#FBF8F3";
+    ctx.fillRect(0, 0, canvas.offsetWidth, canvas.offsetHeight);
+  }, []);
+
+  const getPos = (e) => {
+    const canvas = canvasRef.current;
+    const rect = canvas.getBoundingClientRect();
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    return { x: clientX - rect.left, y: clientY - rect.top };
+  };
+
+  const startDraw = (e) => {
+    e.preventDefault();
+    if (tool === "sticker") {
+      const pos = getPos(e);
+      setStickers(s => [...s, { emoji: stickerOptions[Math.floor(Math.random() * stickerOptions.length)], x: pos.x, y: pos.y }]);
+      return;
+    }
+    setDrawing(true);
+    lastPos.current = getPos(e);
+  };
+
+  const draw = (e) => {
+    e.preventDefault();
+    if (!drawing || tool === "sticker") return;
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext("2d");
+    const pos = getPos(e);
+    
+    ctx.beginPath();
+    ctx.moveTo(lastPos.current.x, lastPos.current.y);
+    ctx.lineTo(pos.x, pos.y);
+    ctx.strokeStyle = tool === "eraser" ? "#FBF8F3" : color;
+    ctx.lineWidth = tool === "eraser" ? brushSize * 3 : brushSize;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.stroke();
+    lastPos.current = pos;
+  };
+
+  const stopDraw = () => { setDrawing(false); lastPos.current = null; };
+
+  const clearCanvas = () => {
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = "#FBF8F3";
+    ctx.fillRect(0, 0, canvas.offsetWidth, canvas.offsetHeight);
+    setStickers([]);
+  };
+
+  return (
+    <GameShell onBack={onBack} title="DreamPaint" color={C.lavenderLight} accent="#9B7FC4">
+      <div style={{ padding: "0 4px" }}>
+        {/* Canvas area */}
+        <div style={{ position: "relative", borderRadius: 20, overflow: "hidden", marginBottom: 16, border: "2px solid rgba(0,0,0,0.06)" }}>
+          <canvas ref={canvasRef}
+            onMouseDown={startDraw} onMouseMove={draw} onMouseUp={stopDraw} onMouseLeave={stopDraw}
+            onTouchStart={startDraw} onTouchMove={draw} onTouchEnd={stopDraw}
+            style={{ width: "100%", height: 320, cursor: tool === "sticker" ? "crosshair" : "default", touchAction: "none", display: "block" }}
+          />
+          {stickers.map((s, i) => (
+            <span key={i} style={{
+              position: "absolute", left: s.x - 16, top: s.y - 16,
+              fontSize: 32, pointerEvents: "none", userSelect: "none",
+            }}>{s.emoji}</span>
+          ))}
+        </div>
+
+        {/* Tools */}
+        <div style={{ display: "flex", gap: 8, justifyContent: "center", marginBottom: 12, flexWrap: "wrap" }}>
+          {[
+            { id: "brush", label: "🖌️ Pincel" },
+            { id: "eraser", label: "🧹 Borrador" },
+            { id: "sticker", label: "⭐ Stickers" },
+          ].map(t => (
+            <button key={t.id} onClick={() => setTool(t.id)}
+              style={{
+                padding: "8px 16px", borderRadius: 50, border: "none",
+                background: tool === t.id ? "#9B7FC4" : "#fff",
+                color: tool === t.id ? "#fff" : C.charcoal,
+                fontSize: 13, fontWeight: 600, cursor: "pointer",
+                boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
+              }}>{t.label}</button>
+          ))}
+          <button onClick={clearCanvas}
+            style={{
+              padding: "8px 16px", borderRadius: 50, border: "none",
+              background: C.coralLight, color: C.coral, fontSize: 13, fontWeight: 600, cursor: "pointer",
+            }}>🗑️ Limpiar</button>
+        </div>
+
+        {/* Color palette */}
+        <div style={{ display: "flex", gap: 6, justifyContent: "center", marginBottom: 12, flexWrap: "wrap" }}>
+          {colors.map(c => (
+            <button key={c} onClick={() => { setColor(c); setTool("brush"); }}
+              style={{
+                width: 32, height: 32, borderRadius: 50, border: color === c && tool === "brush" ? "3px solid #9B7FC4" : "2px solid rgba(0,0,0,0.08)",
+                background: c, cursor: "pointer", transition: "all 0.2s",
+                transform: color === c && tool === "brush" ? "scale(1.2)" : "scale(1)",
+              }} />
+          ))}
+        </div>
+
+        {/* Brush size */}
+        <div style={{ display: "flex", alignItems: "center", gap: 12, justifyContent: "center" }}>
+          <span style={{ fontSize: 12, color: C.muted }}>Fino</span>
+          <input type="range" min="2" max="20" value={brushSize}
+            onChange={e => setBrushSize(Number(e.target.value))}
+            style={{ width: 120, accentColor: "#9B7FC4" }} />
+          <span style={{ fontSize: 12, color: C.muted }}>Grueso</span>
+        </div>
+      </div>
+    </GameShell>
+  );
+}
+
+// ═══ GAME 5: CUENTAHEROES (Story Generator) ═══
+function CuentaHeroes({ onBack }) {
+  const [step, setStep] = useState(0);
+  const [choices, setChoices] = useState({ name: "", sport: "", animal: "", place: "" });
+  const [story, setStory] = useState(null);
+
+  const sportOptions = [
+    { emoji: "⚽", label: "Fútbol" }, { emoji: "🏊", label: "Natación" },
+    { emoji: "🧗", label: "Escalada" }, { emoji: "🏃", label: "Atletismo" },
+  ];
+  const animalOptions = [
+    { emoji: "🐉", label: "Dragón" }, { emoji: "🦊", label: "Zorro" },
+    { emoji: "🦉", label: "Búho" }, { emoji: "🐬", label: "Delfín" },
+  ];
+  const placeOptions = [
+    { emoji: "🏔️", label: "Montaña mágica" }, { emoji: "🌊", label: "Isla flotante" },
+    { emoji: "🌌", label: "Ciudad de las estrellas" }, { emoji: "🌳", label: "Bosque encantado" },
+  ];
+
+  const generateStory = (c) => {
+    const name = c.name || "el héroe";
+    const stories = [
+      `En lo alto de la ${c.place}, ${name} descubrió que su poder secreto estaba conectado al ${c.sport.toLowerCase()}. Cada vez que practicaba, sus piernas brillaban con luz dorada.\n\n"¡Mira!" exclamó ${c.animal}, su fiel compañero. "¡Tus poderes crecen con cada movimiento!"\n\n${name} sonrió. Sabía que el ${c.sport.toLowerCase()} no era solo un deporte — era la llave para proteger a todos los que amaba. Y así, corriendo bajo las estrellas, ${name} se convirtió en la leyenda más grande de la ${c.place}.`,
+      `${name} y ${c.animal} llevaban días buscando el Cristal del Valor perdido en la ${c.place}. "Solo alguien con verdadero coraje puede encontrarlo," había dicho la anciana del pueblo.\n\n"¿Y si usamos el ${c.sport.toLowerCase()}?" sugirió ${c.animal} con un guiño. ${name} entendió: saltó, corrió y se estiró con toda su fuerza...\n\n¡Y ahí estaba! El cristal brillaba entre las nubes. ${name} lo tomó y sintió una calidez en el pecho. No era magia. Era la confianza de saber que podía lograr cualquier cosa si no se rendía.`,
+    ];
+    return stories[Math.floor(Math.random() * stories.length)];
+  };
+
+  const handleOption = (key, value) => {
+    const newChoices = { ...choices, [key]: value };
+    setChoices(newChoices);
+    if (step < 3) {
+      setStep(s => s + 1);
+    } else {
+      setStory(generateStory(newChoices));
+      setStep(4);
+    }
+  };
+
+  return (
+    <GameShell onBack={onBack} title="CuentaHéroes" color={C.skyLight} accent="#5BA4C9">
+      <div style={{ padding: "10px 16px" }}>
+        {/* Progress */}
+        <div style={{ display: "flex", gap: 6, marginBottom: 24, justifyContent: "center" }}>
+          {[0, 1, 2, 3].map(i => (
+            <div key={i} style={{
+              width: 48, height: 5, borderRadius: 3,
+              background: i <= step ? "#5BA4C9" : C.sand,
+              transition: "background 0.3s",
+            }} />
+          ))}
+        </div>
+
+        {step === 0 && (
+          <div style={{ textAlign: "center", animation: "fadeInUp 0.4s ease" }}>
+            <div style={{ fontSize: 56, marginBottom: 16 }}>📖</div>
+            <h3 style={{ fontFamily: "'Playfair Display', serif", fontSize: 22, color: C.navy, marginBottom: 8 }}>¿Cómo se llama tu héroe?</h3>
+            <input type="text" placeholder="Escribe un nombre..."
+              value={choices.name}
+              onChange={e => setChoices({ ...choices, name: e.target.value })}
+              style={{
+                width: "100%", maxWidth: 280, padding: "14px 20px", borderRadius: 14,
+                border: `2px solid ${C.sand}`, fontSize: 16, textAlign: "center",
+                fontFamily: "'DM Sans', sans-serif", outline: "none",
+                transition: "border-color 0.3s",
+              }}
+              onFocus={e => e.target.style.borderColor = "#5BA4C9"}
+              onBlur={e => e.target.style.borderColor = C.sand}
+            />
+            <br />
+            <button onClick={() => setStep(1)} disabled={!choices.name.trim()}
+              style={{ ...btnStyle, background: choices.name.trim() ? "#5BA4C9" : C.sand, marginTop: 20, color: choices.name.trim() ? "#fff" : C.muted }}>
+              Siguiente →
+            </button>
+          </div>
+        )}
+
+        {step === 1 && (
+          <div style={{ textAlign: "center", animation: "fadeInUp 0.4s ease" }}>
+            <h3 style={{ fontFamily: "'Playfair Display', serif", fontSize: 22, color: C.navy, marginBottom: 20 }}>
+              ¿Qué deporte practica {choices.name}?
+            </h3>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, maxWidth: 300, margin: "0 auto" }}>
+              {sportOptions.map(o => (
+                <button key={o.label} onClick={() => handleOption("sport", o.label)}
+                  style={{ ...optionBtn }}>{o.emoji}<br />{o.label}</button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {step === 2 && (
+          <div style={{ textAlign: "center", animation: "fadeInUp 0.4s ease" }}>
+            <h3 style={{ fontFamily: "'Playfair Display', serif", fontSize: 22, color: C.navy, marginBottom: 20 }}>
+              ¿Quién es su compañero?
+            </h3>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, maxWidth: 300, margin: "0 auto" }}>
+              {animalOptions.map(o => (
+                <button key={o.label} onClick={() => handleOption("animal", o.label)}
+                  style={{ ...optionBtn }}>{o.emoji}<br />{o.label}</button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {step === 3 && (
+          <div style={{ textAlign: "center", animation: "fadeInUp 0.4s ease" }}>
+            <h3 style={{ fontFamily: "'Playfair Display', serif", fontSize: 22, color: C.navy, marginBottom: 20 }}>
+              ¿Dónde ocurre la aventura?
+            </h3>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, maxWidth: 300, margin: "0 auto" }}>
+              {placeOptions.map(o => (
+                <button key={o.label} onClick={() => handleOption("place", o.label)}
+                  style={{ ...optionBtn }}>{o.emoji}<br />{o.label}</button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {step === 4 && story && (
+          <div style={{ animation: "fadeInUp 0.5s ease" }}>
+            <div style={{ textAlign: "center", marginBottom: 20 }}>
+              <span style={{ fontSize: 48 }}>✨</span>
+              <h3 style={{ fontFamily: "'Playfair Display', serif", fontSize: 24, color: C.navy }}>
+                La aventura de {choices.name}
+              </h3>
+              <div style={{ display: "flex", gap: 8, justifyContent: "center", marginTop: 8 }}>
+                <span style={tagStyle}>{choices.sport}</span>
+                <span style={tagStyle}>{choices.animal}</span>
+                <span style={tagStyle}>{choices.place}</span>
+              </div>
+            </div>
+            <div style={{
+              background: "#fff", borderRadius: 20, padding: 28,
+              fontSize: 16, color: C.charcoal, lineHeight: 1.9,
+              whiteSpace: "pre-wrap", fontFamily: "'DM Sans', sans-serif",
+              boxShadow: "0 2px 16px rgba(0,0,0,0.04)",
+            }}>
+              {story}
+            </div>
+            <div style={{ textAlign: "center", marginTop: 24 }}>
+              <button onClick={() => { setStep(0); setChoices({ name: "", sport: "", animal: "", place: "" }); setStory(null); }}
+                style={{ ...btnStyle, background: "#5BA4C9" }}>📖 Crear Otro Cuento</button>
+            </div>
+          </div>
+        )}
+      </div>
+    </GameShell>
+  );
+}
+
+
+// ═══ Shared Components ═══
+
+const btnStyle = {
+  padding: "14px 32px", borderRadius: 50, border: "none",
+  color: "#fff", fontSize: 16, fontWeight: 700, cursor: "pointer",
+  fontFamily: "'DM Sans', sans-serif", transition: "all 0.3s",
+  boxShadow: "0 4px 16px rgba(0,0,0,0.15)",
+};
+
+const optionBtn = {
+  padding: 20, borderRadius: 16, border: "none",
+  background: "#fff", fontSize: 16, cursor: "pointer",
+  boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
+  fontFamily: "'DM Sans', sans-serif", fontWeight: 600,
+  color: "#2C3E50", transition: "all 0.2s", lineHeight: 1.6,
+};
+
+const tagStyle = {
+  padding: "4px 12px", borderRadius: 50, fontSize: 12, fontWeight: 600,
+  background: "#EAF5FA", color: "#5BA4C9",
+};
+
+function Stat({ label, value }) {
+  return (
+    <div style={{ textAlign: "center" }}>
+      <div style={{ fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: 0.5 }}>{label}</div>
+      <div style={{ fontSize: 18, fontWeight: 800, color: C.navy, fontFamily: "'Playfair Display', serif" }}>{value}</div>
+    </div>
+  );
+}
+
+function GameShell({ onBack, title, color, accent, topBar, children }) {
+  return (
+    <div style={{
+      minHeight: "100vh", background: color, fontFamily: "'DM Sans', sans-serif",
+      display: "flex", flexDirection: "column",
+    }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700;800&family=DM+Sans:wght@300;400;500;600;700&display=swap');
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.06); } }
+        @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+      `}</style>
+      
+      {/* Header */}
+      <div style={{
+        padding: "16px 20px", display: "flex", alignItems: "center", gap: 12,
+        borderBottom: "1px solid rgba(0,0,0,0.06)", background: "rgba(255,255,255,0.5)",
+        backdropFilter: "blur(20px)",
+      }}>
+        <button onClick={onBack} style={{
+          width: 36, height: 36, borderRadius: 10, border: "none",
+          background: "#fff", cursor: "pointer", fontSize: 16,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
+        }}>←</button>
+        <h1 style={{ fontFamily: "'Playfair Display', serif", fontSize: 20, color: C.navy, flex: 1 }}>{title}</h1>
+      </div>
+      
+      {/* Top bar stats */}
+      {topBar && (
+        <div style={{
+          display: "flex", justifyContent: "center", gap: 28, padding: "12px 20px",
+          background: "rgba(255,255,255,0.4)",
+        }}>
+          {topBar}
+        </div>
+      )}
+      
+      {/* Game content */}
+      <div style={{ flex: 1, padding: "20px 16px", maxWidth: 500, margin: "0 auto", width: "100%" }}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+
+// ═══ GAME HUB ═══
+function GameHub({ onSelectGame, onBack }) {
+  const games = [
+    { id: "pattern", emoji: "🧩", title: "PatternQuest", desc: "Completa secuencias de patrones", age: "3-6", color: C.skyLight, accent: "#5BA4C9", category: "Cognitivo" },
+    { id: "safari", emoji: "🏃", title: "Safari Moves", desc: "Imita movimientos de animales", age: "2-5", color: C.mintLight, accent: "#5DB89A", category: "Motor" },
+    { id: "numero", emoji: "🔢", title: "NumeroBot", desc: "Resuelve problemas matemáticos", age: "4-7", color: C.coralLight, accent: C.coral, category: "Cognitivo" },
+    { id: "dream", emoji: "🎨", title: "DreamPaint", desc: "Dibuja mundos imaginarios", age: "4-8", color: C.lavenderLight, accent: "#9B7FC4", category: "Creatividad" },
+    { id: "cuenta", emoji: "📖", title: "CuentaHéroes", desc: "Crea tu propia historia", age: "3-7", color: C.skyLight, accent: "#5BA4C9", category: "Creatividad" },
+  ];
+
+  return (
+    <div style={{
+      minHeight: "100vh", background: C.cream, fontFamily: "'DM Sans', sans-serif",
+    }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700;800&family=DM+Sans:wght@300;400;500;600;700&display=swap');
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+      `}</style>
+
+      {/* Header */}
+      <div style={{
+        padding: "20px 24px", display: "flex", alignItems: "center", gap: 12,
+        borderBottom: "1px solid rgba(0,0,0,0.06)", background: "rgba(255,255,255,0.8)",
+        backdropFilter: "blur(20px)",
+      }}>
+        <button onClick={onBack} style={{
+          width: 36, height: 36, borderRadius: 10, border: "none",
+          background: C.sand, cursor: "pointer", fontSize: 16,
+          display: "flex", alignItems: "center", justifyContent: "center",
+        }}>←</button>
+        <div>
+          <h1 style={{ fontFamily: "'Playfair Display', serif", fontSize: 22, color: C.navy }}>KidoVerse Games</h1>
+          <p style={{ fontSize: 13, color: C.muted }}>5 juegos listos para jugar</p>
+        </div>
+      </div>
+
+      <div style={{ padding: "24px 20px", maxWidth: 500, margin: "0 auto" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          {games.map((g, i) => (
+            <button key={g.id} onClick={() => onSelectGame(g.id)}
+              style={{
+                display: "flex", alignItems: "center", gap: 16,
+                padding: 20, borderRadius: 20, border: "none",
+                background: "#fff", cursor: "pointer", textAlign: "left",
+                boxShadow: "0 2px 12px rgba(0,0,0,0.04)",
+                transition: "all 0.3s",
+                animation: `fadeInUp 0.4s ease ${i * 0.06}s both`,
+              }}
+              onMouseOver={e => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = "0 6px 24px rgba(0,0,0,0.08)"; }}
+              onMouseOut={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "0 2px 12px rgba(0,0,0,0.04)"; }}
+            >
+              <div style={{
+                width: 56, height: 56, borderRadius: 16, background: g.color,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 28, flexShrink: 0,
+              }}>{g.emoji}</div>
+              <div style={{ flex: 1 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
+                  <span style={{ fontSize: 16, fontWeight: 700, color: C.navy }}>{g.title}</span>
+                  <span style={{ padding: "2px 8px", borderRadius: 50, fontSize: 10, fontWeight: 600, background: g.color, color: g.accent }}>{g.age}</span>
+                </div>
+                <p style={{ fontSize: 13, color: C.muted, margin: 0 }}>{g.desc}</p>
+              </div>
+              <div style={{
+                width: 32, height: 32, borderRadius: 50, background: g.color,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 14, color: g.accent, fontWeight: 700, flexShrink: 0,
+              }}>▶</div>
+            </button>
+          ))}
+        </div>
+
+        {/* Coming soon */}
+        <div style={{
+          marginTop: 24, padding: 20, borderRadius: 16,
+          background: C.sand, textAlign: "center",
+          border: "2px dashed rgba(0,0,0,0.08)",
+        }}>
+          <p style={{ fontSize: 14, color: C.muted }}>
+            🚧 <strong>Próximamente:</strong> Yoga Buddies, MiniLab, RitmoKids, ExploraWorld y BuildIt!
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+// ═══ LANDING PAGE (condensed) ═══
+function Landing({ onPlayGames }) {
+  const [scrolled, setScrolled] = useState(false);
+  const [visible, setVisible] = useState(false);
+  const [billingCycle, setBillingCycle] = useState("monthly");
+
+  useEffect(() => {
+    setVisible(true);
+    const h = () => setScrolled(window.scrollY > 40);
+    window.addEventListener("scroll", h);
+    return () => window.removeEventListener("scroll", h);
+  }, []);
+
+  return (
+    <div style={{ background: C.cream, minHeight: "100vh", fontFamily: "'DM Sans', sans-serif" }}>
+      {/* Nav */}
+      <nav style={{
+        position: "fixed", top: 0, left: 0, right: 0, zIndex: 1000,
+        background: scrolled ? "rgba(251,248,243,0.95)" : "transparent",
+        backdropFilter: scrolled ? "blur(20px)" : "none",
+        borderBottom: scrolled ? "1px solid rgba(0,0,0,0.06)" : "none",
+        transition: "all 0.4s", padding: "0 max(20px, 4vw)",
+      }}>
+        <div style={{ maxWidth: 1200, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between", height: 68 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{
+              width: 34, height: 34, borderRadius: 9,
+              background: `linear-gradient(135deg, ${C.coral}, ${C.gold})`,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: 17, color: "#fff", fontWeight: 800,
+              boxShadow: "0 2px 12px rgba(232,131,107,0.3)",
+            }}>K</div>
+            <span style={{ fontFamily: "'Playfair Display', serif", fontSize: 21, fontWeight: 700, color: C.navy }}>KidoVerse</span>
+          </div>
+          <button onClick={onPlayGames} style={{
+            padding: "10px 24px", borderRadius: 50, border: "none",
+            background: C.navy, color: "#fff", fontSize: 14, fontWeight: 600,
+            cursor: "pointer", fontFamily: "'DM Sans', sans-serif",
+            boxShadow: "0 2px 12px rgba(44,62,80,0.2)",
+          }}>🎮 Jugar Ahora</button>
+        </div>
+      </nav>
+
+      {/* Hero */}
+      <section style={{
+        minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center",
+        padding: "100px max(20px, 4vw) 60px", position: "relative", overflow: "hidden",
+      }}>
+        <div style={{ position: "absolute", top: "10%", right: "-5%", width: 400, height: 400, borderRadius: "50%", background: C.coralLight, opacity: 0.4, filter: "blur(80px)" }} />
+        <div style={{ position: "absolute", bottom: "15%", left: "-5%", width: 350, height: 350, borderRadius: "50%", background: C.skyLight, opacity: 0.5, filter: "blur(80px)" }} />
+        <div style={{ position: "absolute", top: "45%", left: "55%", width: 300, height: 300, borderRadius: "50%", background: C.lavenderLight, opacity: 0.3, filter: "blur(100px)" }} />
+
+        <div style={{
+          maxWidth: 820, textAlign: "center", position: "relative", zIndex: 1,
+          opacity: visible ? 1 : 0, transform: visible ? "translateY(0)" : "translateY(30px)",
+          transition: "all 0.8s cubic-bezier(0.4,0,0.2,1)",
+        }}>
+          <span style={{
+            display: "inline-block", padding: "8px 20px", borderRadius: 50,
+            background: "rgba(255,255,255,0.8)", border: "1px solid rgba(0,0,0,0.06)",
+            fontSize: 14, fontWeight: 500, color: C.coral, marginBottom: 28,
+          }}>✨ La plataforma #1 para padres que quieren más</span>
+
+          <h1 style={{
+            fontFamily: "'Playfair Display', serif", fontSize: "clamp(42px, 7vw, 76px)",
+            fontWeight: 800, color: C.navy, lineHeight: 1.08, letterSpacing: -2, marginBottom: 24,
+          }}>
+            Donde jugar<br />
+            <span style={{
+              background: `linear-gradient(135deg, ${C.coral}, ${C.gold})`,
+              WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+            }}>es crecer</span>
+          </h1>
+
+          <p style={{ fontSize: "clamp(16px, 2vw, 19px)", color: C.muted, lineHeight: 1.7, maxWidth: 540, margin: "0 auto 36px" }}>
+            Juegos con IA, bienestar familiar y contenido experto — todo para criar hijos felices, curiosos y resilientes. Desde $6/mes.
+          </p>
+
+          <div style={{ display: "flex", gap: 14, justifyContent: "center", flexWrap: "wrap" }}>
+            <button onClick={onPlayGames} style={{
+              ...btnStyle,
+              background: `linear-gradient(135deg, ${C.coral}, #D4734E)`,
+              boxShadow: "0 4px 24px rgba(232,131,107,0.35)",
+              fontSize: 17, padding: "16px 36px",
+            }}>🎮 Jugar los Juegos →</button>
+            <a href="#features" style={{
+              ...btnStyle, textDecoration: "none",
+              background: "rgba(255,255,255,0.8)", color: C.navy,
+              boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
+              border: "1px solid rgba(0,0,0,0.08)",
+              fontSize: 17, padding: "16px 36px",
+            }}>Ver más</a>
+          </div>
+
+          <div style={{ marginTop: 48, display: "flex", gap: 28, justifyContent: "center", flexWrap: "wrap", opacity: 0.5 }}>
+            {["Avalado por pedagogos", "IA adaptativa", "Sin anuncios", "100% seguro"].map(t => (
+              <span key={t} style={{ fontSize: 13, color: C.muted, fontWeight: 500, display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ width: 5, height: 5, borderRadius: "50%", background: C.sage, display: "inline-block" }} />
+                {t}
+              </span>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Stats */}
+      <section style={{ padding: "36px max(20px, 4vw)", background: C.navy }}>
+        <div style={{ maxWidth: 900, margin: "0 auto", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 24, textAlign: "center" }}>
+          {[{ n: "5", l: "Juegos jugables" }, { n: "8", l: "Shows curados" }, { n: "$6", l: "USD / mes" }, { n: "2-8", l: "Años de edad" }].map((s, i) => (
+            <div key={i}>
+              <div style={{ fontSize: 32, fontWeight: 800, color: C.coral, fontFamily: "'Playfair Display', serif" }}>{s.n}</div>
+              <div style={{ fontSize: 13, color: "rgba(255,255,255,0.5)", marginTop: 4 }}>{s.l}</div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Features Grid */}
+      <section id="features" style={{ padding: "80px max(20px, 4vw)" }}>
+        <div style={{ maxWidth: 1000, margin: "0 auto", textAlign: "center", marginBottom: 48 }}>
+          <span style={{ display: "inline-block", padding: "6px 16px", borderRadius: 50, background: C.coralLight, color: C.coral, fontSize: 13, fontWeight: 600, marginBottom: 16, letterSpacing: 0.5, textTransform: "uppercase" }}>Todo incluido</span>
+          <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: "clamp(28px, 4vw, 40px)", fontWeight: 700, color: C.navy, lineHeight: 1.2, marginBottom: 16 }}>Una plataforma, infinitas posibilidades</h2>
+        </div>
+        <div style={{ maxWidth: 1000, margin: "0 auto", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 20 }}>
+          {[
+            { emoji: "🧩", title: "Juegos con IA", desc: "5 juegos interactivos que se adaptan al nivel de tu hijo. Desde patrones hasta cuentos personalizados.", color: C.skyLight },
+            { emoji: "🧠", title: "Centro de Bienestar", desc: "Guías de rabietas, burnout parental, inteligencia emocional. Creado por psicólogos infantiles.", color: C.lavenderLight },
+            { emoji: "📰", title: "News Feed Curado", desc: "Neurociencia, crianza consciente y tech responsable. Contenido nuevo cada semana, sin ruido.", color: C.mintLight },
+            { emoji: "📊", title: "Mapa de Desarrollo", desc: "Dashboard IA que rastrea progreso cognitivo, motor y emocional. Alertas y recomendaciones.", color: `${C.gold}20` },
+            { emoji: "👨‍👩‍👧‍👦", title: "Retos Familiares", desc: "Cada domingo, un reto familiar exclusivo. Ranking global, medallas y tiempo de calidad.", color: `${C.sage}20` },
+            { emoji: "💬", title: "Sesión con Psicólogo", desc: "Los suscriptores premium acceden a una sesión mensual gratuita con un profesional certificado.", color: C.coralLight },
+            { emoji: "▶️", title: "KidoTube", desc: "YouTube curado por expertos. 8 shows verificados por pedagogos que desarrollan sin sobreestimular. Cero algoritmos peligrosos.", color: "#FFE4E4" },
+          ].map((f, i) => (
+            <div key={i} style={{
+              background: "#fff", borderRadius: 20, padding: 28,
+              animation: `fadeInUp 0.5s ease ${i * 0.06}s both`,
+              transition: "all 0.3s",
+            }}
+            onMouseOver={e => { e.currentTarget.style.transform = "translateY(-3px)"; e.currentTarget.style.boxShadow = "0 6px 24px rgba(0,0,0,0.06)"; }}
+            onMouseOut={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "none"; }}
+            >
+              <div style={{ width: 48, height: 48, borderRadius: 14, background: f.color, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, marginBottom: 16 }}>{f.emoji}</div>
+              <h3 style={{ fontSize: 18, fontWeight: 700, color: C.navy, marginBottom: 8 }}>{f.title}</h3>
+              <p style={{ fontSize: 14, color: C.muted, lineHeight: 1.7 }}>{f.desc}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ═══ YOUTUBE CURADO ═══ */}
+      <section id="youtube" style={{ padding: "80px max(20px, 4vw)", background: "#fff" }}>
+        <div style={{ maxWidth: 1100, margin: "0 auto" }}>
+          <div style={{ textAlign: "center", marginBottom: 48 }}>
+            <span style={{ display: "inline-block", padding: "6px 16px", borderRadius: 50, background: "#FFE4E4", color: "#FF4444", fontSize: 13, fontWeight: 600, marginBottom: 16, letterSpacing: 0.5, textTransform: "uppercase" }}>
+              ▶ KidoTube
+            </span>
+            <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: "clamp(28px, 4vw, 40px)", fontWeight: 700, color: C.navy, lineHeight: 1.2, marginBottom: 16 }}>
+              YouTube sin preocupaciones
+            </h2>
+            <p style={{ fontSize: 16, color: C.muted, lineHeight: 1.7, maxWidth: 560, margin: "0 auto" }}>
+              Shows y canales verificados por pedagogos y psicólogos infantiles. Solo contenido que desarrolla, nunca que daña. Curado por expertos, disfrutado por familias.
+            </p>
+          </div>
+
+          {/* Age filter tabs */}
+          <div style={{ display: "flex", gap: 8, justifyContent: "center", marginBottom: 32, flexWrap: "wrap" }}>
+            {["Todos (2-8)", "Bebés (2-3)", "Preescolar (3-5)", "Primeros lectores (5-8)"].map((tab, i) => (
+              <span key={tab} style={{
+                padding: "8px 18px", borderRadius: 50, fontSize: 13, fontWeight: i === 0 ? 600 : 500,
+                background: i === 0 ? C.navy : "rgba(0,0,0,0.04)",
+                color: i === 0 ? "#fff" : C.muted,
+                cursor: "pointer", border: "1px solid rgba(0,0,0,0.06)",
+              }}>{tab}</span>
+            ))}
+          </div>
+
+          {/* Video grid */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 20 }}>
+            {[
+              {
+                title: "Bluey",
+                channel: "Bluey - Canal Oficial",
+                videoId: "qlCaXrifzoY",
+                age: "3-8",
+                rating: "⭐ 9.8/10",
+                badge: "#1 Expertos",
+                badgeColor: "#FFD700",
+                tags: ["Juego imaginativo", "Vínculos familiares", "Empatía"],
+                desc: "El gold standard según expertos. Enseña resolución de conflictos, creatividad y la importancia del juego libre a través de una familia de perros australianos.",
+                category: "Emocional + Social",
+                catColor: C.skyLight, catAccent: "#5BA4C9"
+              },
+              {
+                title: "Daniel Tiger's Neighborhood",
+                channel: "PBS KIDS",
+                videoId: "bruLsEPKbwM",
+                age: "2-5",
+                rating: "⭐ 9.6/10",
+                badge: "Psicólogos",
+                badgeColor: "#9B7FC4",
+                tags: ["Inteligencia emocional", "Rutinas", "Canciones educativas"],
+                desc: "Inspirado en Mister Rogers, usa canciones pegadizas para enseñar a los niños a manejar emociones grandes. Aprobado por terapeutas del habla y psicólogos infantiles.",
+                category: "Emocional + Lenguaje",
+                catColor: C.lavenderLight, catAccent: "#9B7FC4"
+              },
+              {
+                title: "Peppa Pig",
+                channel: "Peppa Pig - Canal Oficial",
+                videoId: "5pRiqWjeiI8",
+                age: "2-5",
+                rating: "⭐ 9.2/10",
+                badge: "Clásico",
+                badgeColor: "#E8836B",
+                tags: ["Modales", "Compartir", "Vida cotidiana"],
+                desc: "Episodios cortos de 5 minutos con lecciones simples sobre respeto, turnos y diferencias. Su estilo visual sencillo evita la sobreestimulación.",
+                category: "Social + Lenguaje",
+                catColor: C.coralLight, catAccent: C.coral
+              },
+              {
+                title: "Sesame Street",
+                channel: "Sesame Street",
+                videoId: "Gy3Nh0MdEys",
+                age: "2-6",
+                rating: "⭐ 9.7/10",
+                badge: "Legendario",
+                badgeColor: "#5DB89A",
+                tags: ["Letras y números", "Diversidad", "Inclusión"],
+                desc: "Más de 50 años formando generaciones. Enseña alfabeto, números y habilidades sociales celebrando la diversidad. Respaldado por décadas de investigación educativa.",
+                category: "Cognitivo + Social",
+                catColor: C.mintLight, catAccent: "#5DB89A"
+              },
+              {
+                title: "Numberblocks",
+                channel: "Numberblocks",
+                videoId: "Epkwg4hDf5M",
+                age: "3-6",
+                rating: "⭐ 9.5/10",
+                badge: "STEM",
+                badgeColor: "#5BA4C9",
+                tags: ["Matemáticas", "Patrones", "Pensamiento lógico"],
+                desc: "Bloques animados que enseñan conceptos matemáticos de forma visual y progresiva. Recomendado por educadores como la mejor introducción a las matemáticas.",
+                category: "Cognitivo + Matemáticas",
+                catColor: C.skyLight, catAccent: "#5BA4C9"
+              },
+              {
+                title: "Wild Kratts",
+                channel: "Wild Kratts",
+                videoId: "BrTGLiWw5eg",
+                age: "5-8",
+                rating: "⭐ 9.3/10",
+                badge: "Ciencia",
+                badgeColor: "#5DB89A",
+                tags: ["Animales", "Naturaleza", "Aventura"],
+                desc: "Los hermanos Kratt se transforman en animales para enseñar biología de forma divertida. Combina acción real con animación, estimulando curiosidad científica.",
+                category: "Ciencia + Naturaleza",
+                catColor: C.mintLight, catAccent: "#5DB89A"
+              },
+              {
+                title: "Puffin Rock",
+                channel: "Puffin Rock",
+                videoId: "zB31dMKFRKc",
+                age: "2-5",
+                rating: "⭐ 9.1/10",
+                badge: "Calmante",
+                badgeColor: "#A8B5A0",
+                tags: ["Naturaleza", "Ritmo suave", "Hermanos"],
+                desc: "Animación irlandesa con ritmo suave y narración tranquila. Ideal para antes de dormir. Enseña sobre la naturaleza y la relación entre hermanos sin sobreestimular.",
+                category: "Naturaleza + Calma",
+                catColor: `${C.sage}20`, catAccent: C.sageDark
+              },
+              {
+                title: "StoryBots",
+                channel: "Netflix Jr.",
+                videoId: "KpBp0sdalNw",
+                age: "4-8",
+                rating: "⭐ 9.4/10",
+                badge: "Curiosidad",
+                badgeColor: "#D4A853",
+                tags: ["Preguntas", "Ciencia", "Humor inteligente"],
+                desc: "Responde las grandes preguntas de los niños (¿por qué es azul el cielo?) con humor inteligente y cameos de celebridades. Ganador de múltiples premios Emmy.",
+                category: "Ciencia + Curiosidad",
+                catColor: `${C.gold}20`, catAccent: C.gold
+              },
+            ].map((show, i) => (
+              <div key={i} style={{
+                background: C.cream, borderRadius: 20, overflow: "hidden",
+                transition: "all 0.3s",
+                animation: `fadeInUp 0.5s ease ${i * 0.05}s both`,
+                cursor: "pointer",
+              }}
+              onMouseOver={e => { e.currentTarget.style.transform = "translateY(-3px)"; e.currentTarget.style.boxShadow = "0 8px 32px rgba(0,0,0,0.08)"; }}
+              onMouseOut={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "none"; }}
+              >
+                {/* Thumbnail */}
+                <div style={{ position: "relative", paddingBottom: "56.25%", background: "#000" }}
+                  onClick={() => window.open(`https://www.youtube.com/watch?v=${show.videoId}`, '_blank')}
+                >
+                  <img
+                    src={`https://img.youtube.com/vi/${show.videoId}/hqdefault.jpg`}
+                    alt={show.title}
+                    style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", objectFit: "cover" }}
+                  />
+                  {/* Play button overlay */}
+                  <div style={{
+                    position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)",
+                    width: 56, height: 56, borderRadius: "50%",
+                    background: "rgba(255,0,0,0.9)", display: "flex", alignItems: "center", justifyContent: "center",
+                    boxShadow: "0 4px 16px rgba(0,0,0,0.3)",
+                  }}>
+                    <div style={{ width: 0, height: 0, borderTop: "10px solid transparent", borderBottom: "10px solid transparent", borderLeft: "18px solid #fff", marginLeft: 3 }} />
+                  </div>
+                  {/* Expert badge */}
+                  <div style={{
+                    position: "absolute", top: 10, left: 10, padding: "4px 10px", borderRadius: 6,
+                    background: show.badgeColor, color: "#fff", fontSize: 10, fontWeight: 800,
+                    textTransform: "uppercase", letterSpacing: 0.5,
+                    boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
+                  }}>{show.badge}</div>
+                  {/* Age badge */}
+                  <div style={{
+                    position: "absolute", top: 10, right: 10, padding: "4px 10px", borderRadius: 6,
+                    background: "rgba(0,0,0,0.7)", color: "#fff", fontSize: 11, fontWeight: 600,
+                  }}>{show.age} años</div>
+                </div>
+
+                {/* Info */}
+                <div style={{ padding: 20 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
+                    <div>
+                      <h3 style={{ fontSize: 17, fontWeight: 700, color: C.navy, marginBottom: 2, fontFamily: "'DM Sans', sans-serif" }}>{show.title}</h3>
+                      <span style={{ fontSize: 12, color: C.muted }}>{show.channel}</span>
+                    </div>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: C.gold, whiteSpace: "nowrap" }}>{show.rating}</span>
+                  </div>
+
+                  <span style={{
+                    display: "inline-block", padding: "3px 10px", borderRadius: 50, fontSize: 11, fontWeight: 600,
+                    background: show.catColor, color: show.catAccent, marginBottom: 10,
+                  }}>{show.category}</span>
+
+                  <p style={{ fontSize: 13, color: C.muted, lineHeight: 1.65, marginBottom: 12 }}>{show.desc}</p>
+
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                    {show.tags.map(tag => (
+                      <span key={tag} style={{
+                        padding: "3px 9px", borderRadius: 50, fontSize: 10, fontWeight: 500,
+                        background: "rgba(0,0,0,0.04)", color: C.charcoal,
+                      }}>#{tag}</span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Safety notice */}
+          <div style={{
+            marginTop: 32, padding: 24, borderRadius: 16,
+            background: `linear-gradient(135deg, ${C.mintLight}, ${C.skyLight})`,
+            display: "flex", alignItems: "flex-start", gap: 16, flexWrap: "wrap",
+          }}>
+            <div style={{ fontSize: 32 }}>🛡️</div>
+            <div style={{ flex: 1, minWidth: 260 }}>
+              <h4 style={{ fontSize: 16, fontWeight: 700, color: C.navy, marginBottom: 6 }}>Curado por expertos, seguro para tu familia</h4>
+              <p style={{ fontSize: 14, color: C.muted, lineHeight: 1.7 }}>
+                Cada show en KidoTube es revisado por nuestro equipo de pedagogos y psicólogos infantiles. Evaluamos ritmo visual, valores transmitidos, nivel de estimulación y beneficio educativo real. Cero contenido basura. Cero algoritmos peligrosos. Solo lo mejor.
+              </p>
+              <div style={{ display: "flex", gap: 16, marginTop: 12, flexWrap: "wrap" }}>
+                {["✅ Sin sobreestimulación", "✅ Valores positivos", "✅ Ritmo adecuado", "✅ Educativo comprobado"].map(c => (
+                  <span key={c} style={{ fontSize: 12, fontWeight: 600, color: C.sageDark }}>{c}</span>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Screen time tip */}
+          <div style={{
+            marginTop: 16, padding: 20, borderRadius: 14,
+            background: C.cream, border: "1px solid rgba(0,0,0,0.04)",
+            display: "flex", alignItems: "center", gap: 14,
+          }}>
+            <span style={{ fontSize: 24 }}>⏰</span>
+            <div>
+              <span style={{ fontSize: 14, fontWeight: 600, color: C.navy }}>Consejo de pantalla: </span>
+              <span style={{ fontSize: 14, color: C.muted }}>
+                La AAP recomienda máximo 1 hora diaria de contenido de calidad para niños de 2-5 años, siempre acompañados. KidoVerse te ayuda a elegir lo mejor de esa hora.
+              </span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Pricing */}
+      <section style={{ padding: "80px max(20px, 4vw)", background: "#fff" }}>
+        <div style={{ maxWidth: 750, margin: "0 auto", textAlign: "center" }}>
+          <span style={{ display: "inline-block", padding: "6px 16px", borderRadius: 50, background: C.coralLight, color: C.coral, fontSize: 13, fontWeight: 600, marginBottom: 16, letterSpacing: 0.5, textTransform: "uppercase" }}>Precio</span>
+          <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: "clamp(28px, 4vw, 40px)", fontWeight: 700, color: C.navy, marginBottom: 32 }}>Menos que un café. Más que una educación.</h2>
+
+          <div style={{ display: "flex", justifyContent: "center", marginBottom: 36 }}>
+            <div style={{ display: "flex", background: C.sand, borderRadius: 50, padding: 4 }}>
+              {["monthly", "annual"].map(c => (
+                <button key={c} onClick={() => setBillingCycle(c)}
+                  style={{
+                    padding: "10px 22px", borderRadius: 50, border: "none",
+                    background: billingCycle === c ? "#fff" : "transparent",
+                    color: billingCycle === c ? C.navy : C.muted,
+                    fontSize: 14, fontWeight: billingCycle === c ? 600 : 400,
+                    cursor: "pointer", transition: "all 0.3s",
+                  }}>{c === "monthly" ? "Mensual" : "Anual — Ahorra 33%"}</button>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 20 }}>
+            {/* Free */}
+            <div style={{ background: C.cream, borderRadius: 24, padding: 32, textAlign: "left" }}>
+              <span style={{ fontSize: 13, fontWeight: 600, color: C.muted, textTransform: "uppercase" }}>Explorador</span>
+              <div style={{ margin: "16px 0" }}>
+                <span style={{ fontSize: 38, fontWeight: 800, color: C.navy, fontFamily: "'Playfair Display', serif" }}>$0</span>
+                <span style={{ fontSize: 14, color: C.muted }}> / siempre</span>
+              </div>
+              {["2 juegos gratuitos", "News Feed básico", "1 artículo/semana"].map(f => (
+                <div key={f} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                  <span style={{ color: C.sage }}>✓</span>
+                  <span style={{ fontSize: 14, color: C.charcoal }}>{f}</span>
+                </div>
+              ))}
+              <button onClick={onPlayGames} style={{ width: "100%", marginTop: 20, padding: 14, borderRadius: 50, border: `2px solid ${C.sand}`, background: "transparent", color: C.navy, fontSize: 15, fontWeight: 600, cursor: "pointer" }}>Empezar Gratis</button>
+            </div>
+            {/* Premium */}
+            <div style={{ background: C.navy, borderRadius: 24, padding: 32, textAlign: "left", position: "relative", boxShadow: "0 12px 48px rgba(44,62,80,0.2)" }}>
+              <div style={{ position: "absolute", top: 14, right: 14, padding: "4px 12px", borderRadius: 50, background: C.coral, color: "#fff", fontSize: 11, fontWeight: 700 }}>POPULAR</div>
+              <span style={{ fontSize: 13, fontWeight: 600, color: "rgba(255,255,255,0.5)", textTransform: "uppercase" }}>Premium</span>
+              <div style={{ margin: "16px 0" }}>
+                <span style={{ fontSize: 38, fontWeight: 800, color: "#fff", fontFamily: "'Playfair Display', serif" }}>${billingCycle === "monthly" ? "6" : "4"}</span>
+                <span style={{ fontSize: 14, color: "rgba(255,255,255,0.5)" }}> / mes</span>
+              </div>
+              {["Todos los juegos + nuevos cada mes", "KidoTube: YouTube curado por expertos", "Mapa de Desarrollo IA", "Centro de Bienestar completo", "News Feed premium", "Retos Familiares semanales", "1 sesión/mes con psicólogo", "Sin anuncios"].map(f => (
+                <div key={f} style={{ display: "flex", alignItems: "flex-start", gap: 8, marginBottom: 8 }}>
+                  <span style={{ color: C.coral, marginTop: 1 }}>✓</span>
+                  <span style={{ fontSize: 14, color: "rgba(255,255,255,0.85)" }}>{f}</span>
+                </div>
+              ))}
+              <a href="https://buy.stripe.com/test_6oU9AT4zweWvfO02iWenS00" target="_blank" rel="noopener" style={{ display: "block", width: "100%", marginTop: 20, padding: 14, borderRadius: 50, border: "none", background: `linear-gradient(135deg, ${C.coral}, ${C.gold})`, color: "#fff", fontSize: 15, fontWeight: 700, cursor: "pointer", boxShadow: "0 4px 20px rgba(232,131,107,0.3)", textAlign: "center", textDecoration: "none" }}>
+                Prueba 3 Días Gratis →
+              </a>
+              <p style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", textAlign: "center", marginTop: 10 }}>Cancela cuando quieras</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Final CTA */}
+      <section style={{ padding: "80px max(20px, 4vw)", background: C.navy, textAlign: "center", position: "relative", overflow: "hidden" }}>
+        <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: 500, height: 500, borderRadius: "50%", background: `radial-gradient(circle, ${C.coral}15 0%, transparent 70%)` }} />
+        <div style={{ position: "relative", zIndex: 1, maxWidth: 560, margin: "0 auto" }}>
+          <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: "clamp(30px, 5vw, 46px)", fontWeight: 800, color: "#fff", lineHeight: 1.15, marginBottom: 20 }}>
+            La infancia pasa rápido.<br /><span style={{ color: C.coral }}>Hazla extraordinaria.</span>
+          </h2>
+          <p style={{ fontSize: 17, color: "rgba(255,255,255,0.5)", lineHeight: 1.7, marginBottom: 32 }}>
+            Únete a familias que descubrieron que jugar con intención es el mejor regalo.
+          </p>
+          <a href="https://buy.stripe.com/test_6oU9AT4zweWvfO02iWenS00" target="_blank" rel="noopener" style={{
+            ...btnStyle, background: `linear-gradient(135deg, ${C.coral}, ${C.gold})`,
+            boxShadow: "0 4px 32px rgba(232,131,107,0.4)", fontSize: 18, padding: "18px 44px",
+            textDecoration: "none", display: "inline-block",
+          }}>Empieza Gratis Hoy →</a>
+          <p style={{ fontSize: 12, color: "rgba(255,255,255,0.25)", marginTop: 14 }}>3 días gratis · Cancela cuando quieras</p>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer style={{ padding: "48px max(20px, 4vw) 24px", background: "#1a2a3a" }}>
+        <div style={{ maxWidth: 1000, margin: "0 auto", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 16 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={{ width: 28, height: 28, borderRadius: 7, background: `linear-gradient(135deg, ${C.coral}, ${C.gold})`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, color: "#fff", fontWeight: 800 }}>K</div>
+            <span style={{ fontFamily: "'Playfair Display', serif", fontSize: 16, fontWeight: 700, color: "#fff" }}>KidoVerse</span>
+          </div>
+          <span style={{ fontSize: 12, color: "rgba(255,255,255,0.25)" }}>© 2026 KidoVerse · Hecho con ❤️ para familias</span>
+        </div>
+      </footer>
+    </div>
+  );
+}
+
+
+// ═══ PLATFORM SHELL — Tabbed navigation with all sections ═══
+function Platform() {
+  const [tab, setTab] = useState("home");
+  const [activeGame, setActiveGame] = useState(null);
+
+  const tabs = [
+    { id: "home", icon: "🏠", label: "Inicio" },
+    { id: "games", icon: "🎮", label: "Juegos" },
+    { id: "bienestar", icon: "🧠", label: "Bienestar" },
+    { id: "news", icon: "📰", label: "Noticias" },
+    { id: "mapa", icon: "📊", label: "Desarrollo" },
+    { id: "retos", icon: "🏆", label: "Retos" },
+    { id: "psicologo", icon: "💬", label: "Psicólogo" },
+    { id: "kidotube", icon: "▶️", label: "KidoTube" },
+  ];
+
+  // If a game is active, render it full-screen
+  const gameComponents = { pattern: PatternQuest, safari: SafariMoves, numero: NumeroBot, dream: DreamPaint, cuenta: CuentaHeroes };
+  if (activeGame) {
+    const GameComp = gameComponents[activeGame];
+    return (
+      <div style={{ minHeight: "100vh", background: C.cream, fontFamily: "'DM Sans', sans-serif" }}>
+        <style>{`
+          @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700;800&family=DM+Sans:wght@300;400;500;600;700&display=swap');
+          *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+          @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+          @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.06); } }
+          @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+          @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        `}</style>
+        <GameComp onBack={() => setActiveGame(null)} />
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ minHeight: "100vh", background: C.cream, fontFamily: "'DM Sans', sans-serif" }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700;800&family=DM+Sans:wght@300;400;500;600;700&display=swap');
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.04); } }
+        @keyframes slideRight { from { opacity: 0; transform: translateX(-16px); } to { opacity: 1; transform: translateX(0); } }
+        @keyframes progressFill { from { width: 0; } }
+        @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+        html { scroll-behavior: smooth; }
+        ::selection { background: ${C.coralLight}; color: ${C.coral}; }
+      `}</style>
+
+      {/* Top Bar */}
+      <header style={{ position: "sticky", top: 0, zIndex: 100, background: "rgba(251,248,243,0.95)", backdropFilter: "blur(20px)", borderBottom: "1px solid rgba(0,0,0,0.06)", padding: "0 max(16px,3vw)" }}>
+        <div style={{ maxWidth: 1200, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between", height: 56 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+            <div style={{ width: 30, height: 30, borderRadius: 8, background: `linear-gradient(135deg, ${C.coral}, ${C.gold})`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, color: "#fff", fontWeight: 800 }}>K</div>
+            <span style={{ fontFamily: "'Playfair Display', serif", fontSize: 18, fontWeight: 700, color: C.navy }}>KidoVerse</span>
+          </div>
+          <span style={{ fontSize: 13, color: C.muted }}>Hola, Familia 👋</span>
+        </div>
+      </header>
+
+      {/* Tab Navigation */}
+      <nav style={{ position: "sticky", top: 56, zIndex: 99, background: "#fff", borderBottom: "1px solid rgba(0,0,0,0.06)", overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+        <div style={{ display: "flex", gap: 0, maxWidth: 1200, margin: "0 auto", minWidth: "max-content" }}>
+          {tabs.map(t => (
+            <button key={t.id} onClick={() => setTab(t.id)} style={{
+              padding: "11px 16px", border: "none", background: "transparent", cursor: "pointer", fontSize: 12.5, fontWeight: tab === t.id ? 700 : 500,
+              color: tab === t.id ? C.coral : C.muted, borderBottom: tab === t.id ? `2px solid ${C.coral}` : "2px solid transparent",
+              transition: "all 0.2s", whiteSpace: "nowrap", fontFamily: "'DM Sans', sans-serif",
+            }}><span style={{ marginRight: 5 }}>{t.icon}</span>{t.label}</button>
+          ))}
+        </div>
+      </nav>
+
+      {/* Content */}
+      <main style={{ maxWidth: 1000, margin: "0 auto", padding: "24px max(16px,3vw) 80px" }}>
+        {tab === "home" && <PlatformHome onNavigate={setTab} onPlayGame={setActiveGame} />}
+        {tab === "games" && <PlatformGames onPlay={setActiveGame} />}
+        {tab === "bienestar" && <PlatformBienestar />}
+        {tab === "news" && <PlatformNews />}
+        {tab === "mapa" && <PlatformMapa />}
+        {tab === "retos" && <PlatformRetos />}
+        {tab === "psicologo" && <PlatformPsicologo />}
+        {tab === "kidotube" && <PlatformKidoTube />}
+      </main>
+    </div>
+  );
+}
+
+// ═══ PLATFORM HOME ═══
+function PlatformHome({ onNavigate, onPlayGame }) {
+  return (
+    <div>
+      <div style={{ marginBottom: 28, animation: "fadeInUp 0.5s ease" }}>
+        <h1 style={{ fontFamily: "'Playfair Display', serif", fontSize: 26, color: C.navy, marginBottom: 4 }}>Buenos días ☀️</h1>
+        <p style={{ fontSize: 14, color: C.muted }}>Tu familia tiene 3 actividades pendientes hoy</p>
+      </div>
+      <div style={{ background: `linear-gradient(135deg, ${C.navy}, #1a3a4a)`, borderRadius: 18, padding: 24, marginBottom: 24, color: "#fff", position: "relative", overflow: "hidden", animation: "fadeInUp 0.5s ease 0.1s both" }}>
+        <span style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: 1, opacity: 0.5 }}>Actividad del día</span>
+        <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: 20, margin: "8px 0", lineHeight: 1.3 }}>🐸 Safari Moves: ¡Hoy toca saltar!</h2>
+        <p style={{ fontSize: 13, opacity: 0.6, marginBottom: 14 }}>10 min de movimiento que fortalecen coordinación y vínculo familiar.</p>
+        <button onClick={() => onPlayGame("safari")} style={{ padding: "9px 22px", borderRadius: 50, border: "none", background: C.coral, color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Empezar ahora →</button>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 12 }}>
+        {[
+          { id: "games", icon: "🎮", title: "Juegos", desc: "5 juegos listos", color: C.coralLight },
+          { id: "bienestar", icon: "🧠", title: "Bienestar", desc: "6 guías nuevas", color: C.lavenderLight },
+          { id: "news", icon: "📰", title: "Noticias", desc: "4 artículos", color: C.mintLight },
+          { id: "mapa", icon: "📊", title: "Desarrollo", desc: "Ver progreso", color: C.skyLight },
+          { id: "retos", icon: "🏆", title: "Retos", desc: "Reto activo", color: `${C.gold}25` },
+          { id: "psicologo", icon: "💬", title: "Psicólogo", desc: "Agendar sesión", color: C.coralLight },
+          { id: "kidotube", icon: "▶️", title: "KidoTube", desc: "8 shows", color: "#FFE4E4" },
+        ].map((a, i) => (
+          <button key={a.id} onClick={() => onNavigate(a.id)} style={{ background: "#fff", borderRadius: 14, padding: 16, border: "none", cursor: "pointer", textAlign: "left", transition: "all 0.3s", animation: `fadeInUp 0.4s ease ${i*0.04}s both` }}
+            onMouseOver={e => e.currentTarget.style.transform = "translateY(-2px)"} onMouseOut={e => e.currentTarget.style.transform = "translateY(0)"}>
+            <div style={{ width: 36, height: 36, borderRadius: 10, background: a.color, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, marginBottom: 10 }}>{a.icon}</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: C.navy, marginBottom: 2 }}>{a.title}</div>
+            <div style={{ fontSize: 11, color: C.muted }}>{a.desc}</div>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ═══ PLATFORM GAMES ═══
+function PlatformGames({ onPlay }) {
+  const games = [
+    { id: "pattern", emoji: "🧩", title: "PatternQuest", desc: "Completa secuencias de patrones", age: "3-6", color: C.skyLight, accent: "#5BA4C9" },
+    { id: "safari", emoji: "🏃", title: "Safari Moves", desc: "Imita movimientos de animales", age: "2-5", color: C.mintLight, accent: "#5DB89A" },
+    { id: "numero", emoji: "🔢", title: "NumeroBot", desc: "Resuelve problemas matemáticos", age: "4-7", color: C.coralLight, accent: C.coral },
+    { id: "dream", emoji: "🎨", title: "DreamPaint", desc: "Dibuja mundos imaginarios", age: "4-8", color: C.lavenderLight, accent: "#9B7FC4" },
+    { id: "cuenta", emoji: "📖", title: "CuentaHéroes", desc: "Crea tu propia historia", age: "3-7", color: C.skyLight, accent: "#5BA4C9" },
+  ];
+  return (
+    <div>
+      <div style={{ marginBottom: 24 }}>
+        <span style={{ display: "inline-block", padding: "5px 14px", borderRadius: 50, background: C.coralLight, color: C.coral, fontSize: 12, fontWeight: 600, marginBottom: 12, textTransform: "uppercase" }}>🎮 Juegos</span>
+        <h1 style={{ fontFamily: "'Playfair Display', serif", fontSize: 26, color: C.navy, marginBottom: 4 }}>5 juegos listos para jugar</h1>
+        <p style={{ fontSize: 14, color: C.muted }}>Elige y empieza a aprender jugando.</p>
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        {games.map((g, i) => (
+          <button key={g.id} onClick={() => onPlay(g.id)} style={{ display: "flex", alignItems: "center", gap: 14, padding: 18, borderRadius: 16, border: "none", background: "#fff", cursor: "pointer", textAlign: "left", transition: "all 0.3s", animation: `fadeInUp 0.4s ease ${i*0.05}s both` }}
+            onMouseOver={e => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = "0 6px 24px rgba(0,0,0,0.07)"; }}
+            onMouseOut={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "none"; }}>
+            <div style={{ width: 50, height: 50, borderRadius: 14, background: g.color, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, flexShrink: 0 }}>{g.emoji}</div>
+            <div style={{ flex: 1 }}><div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}><span style={{ fontSize: 15, fontWeight: 700, color: C.navy }}>{g.title}</span><span style={{ padding: "2px 8px", borderRadius: 50, fontSize: 10, fontWeight: 600, background: g.color, color: g.accent }}>{g.age}</span></div><p style={{ fontSize: 13, color: C.muted, margin: 0 }}>{g.desc}</p></div>
+            <div style={{ width: 30, height: 30, borderRadius: 50, background: g.color, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, color: g.accent, fontWeight: 700 }}>▶</div>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ═══ PLATFORM BIENESTAR ═══
+function PlatformBienestar() {
+  const [exp, setExp] = useState(null);
+  const arts = [
+    { id:1, icon:"😤", cat:"Rabietas", time:"5 min", title:"Guía completa: Cómo acompañar una rabieta", preview:"Las rabietas no son manipulación — son el cerebro de tu hijo pidiendo ayuda.", body:"¿Por qué ocurren?\n\nEl cerebro de un niño de 2-6 años tiene la corteza prefrontal aún en desarrollo. Cuando grita o llora, no está siendo 'malo'. Su cerebro no puede regular la emoción.\n\nTécnica de 3 pasos:\n\n1. Contener sin reprimir: Baja a su nivel. Voz suave: 'Veo que estás enojado. Estoy aquí.'\n\n2. Nombrar la emoción: 'Parece que estás frustrado porque querías seguir jugando.' Estudios del Dr. Dan Siegel muestran que nombrar reduce la activación de la amígdala.\n\n3. Ofrecer opciones: '¿Quieres un abrazo o un momento solo?' Dale autonomía.\n\nLo que NUNCA funciona: Gritar de vuelta, ignorar completamente, sobornar con dulces, castigos físicos.\n\nDato clave: Las rabietas disminuyen entre los 4-5 años. Tu trabajo es ser el 'regulador externo' hasta que pueda hacerlo solo." },
+    { id:2, icon:"💆", cat:"Burnout Parental", time:"7 min", title:"Señales de burnout y qué hacer antes del límite", preview:"1 de cada 3 padres experimenta burnout. No es debilidad — es sobrecarga.", body:"3 dimensiones (Dra. Roskam, U. de Lovaina):\n\n1. Agotamiento extremo: Vacío incluso después de dormir.\n2. Distanciamiento emocional: Piloto automático sin conectar.\n3. Pérdida de realización: Sentir que nada es suficiente.\n\n10 señales:\n— Irritabilidad constante\n— Fantasear con 'escapar'\n— Culpa crónica\n— Compararse en redes\n— Recurrir al celular para desconectar\n— Llantos inesperados\n\nPlan de acción:\nDía 1-2: Anota TODO lo que haces. Delega 2 tareas.\nDía 3-4: 15 min x 3 al día donde NO eres padre/madre.\nDía 5-7: Habla con alguien: 'Estoy agotado/a y necesito ayuda.'\n\nFrase: 'No puedes servir de un vaso vacío.'" },
+    { id:3, icon:"🌱", cat:"Inteligencia Emocional", time:"6 min", title:"Enseñar a nombrar emociones (por edad)", preview:"Niños que nombran lo que sienten tienen 40% menos problemas de comportamiento.", body:"2-3 años: 4 emociones básicas — Feliz, Triste, Enojado, Asustado. Usa caras expresivas y espejo.\n\n4-5 años: Agrega Frustrado, Emocionado, Celoso, Orgulloso. Actividad: 'Frasco de emociones' — cada noche elige un color de plastilina.\n\n6-8 años: Agrega Ansioso, Decepcionado, Agradecido. Pueden sentir dos emociones a la vez. Actividad: Diario de 3 preguntas cada noche.\n\n5 frases diarias:\n1. '¿Cómo te sientes?'\n2. 'Parece que sientes [emoción]. ¿Es así?'\n3. 'Todas las emociones están permitidas. No todos los comportamientos.'\n4. '¿Qué necesitas ahora?'\n5. 'Gracias por contarme.'" },
+    { id:4, icon:"😴", cat:"Sueño", time:"5 min", title:"La rutina de sueño que funciona desde los 2 años", preview:"Los niños que duermen bien aprenden mejor y tienen menos rabietas.", body:"Horas recomendadas (AAP):\n2-3 años: 11-14h | 3-5: 10-13h | 6-8: 9-12h\n\nRutina de 4 pasos (30 min antes):\n\n1. Señal de cierre (5 min): 'Quedan 5 min.' Apaga pantallas.\n2. Higiene (10 min): Baño tibio, dientes, pijama. Mismo orden.\n3. Conexión (10 min): Cuento o conversación. '¿Cuál fue tu parte favorita del día?'\n4. Despedida (5 min): Frase ritual. Luz apagada. Sal.\n\nRegla de oro: Consistencia > perfección. Misma rutina, misma hora, 7 días." },
+    { id:5, icon:"🤝", cat:"Social", time:"6 min", title:"6 juegos para enseñar empatía y resolución de conflictos", preview:"La empatía no es innata — se construye con estos juegos.", body:"1. Juego del espejo (2+): Uno hace expresión, otro imita y nombra la emoción.\n\n2. Torre cooperativa (3+): Construir juntos, una pieza por turno. Si se cae, reconstruyen.\n\n3. Buzón de amabilidad (4+): Cada día, escribir algo amable sobre otro familiar.\n\n4. ¿Qué harías tú? (5+): Escenarios de conflicto, discutir opciones sin respuestas 'correctas'.\n\n5. Dirigir la orquesta (3+): Uno dirige, otros siguen. Cambiar roles.\n\n6. Detective de sentimientos (5+): Ver Bluey sin sonido, adivinar emociones por lenguaje corporal." },
+    { id:6, icon:"📵", cat:"Pantallas", time:"5 min", title:"Guía de screen time: cuánto, qué y cómo", preview:"No es cuánto tiempo — es qué contenido y cómo se consume.", body:"3 reglas de KidoVerse:\n\n1. Nunca solo, siempre acompañado (2-5 años)\n2. Contenido activo (70%) > pasivo (30%)\n3. Sin pantallas en las 3 transiciones: despertar, comidas, antes de dormir\n\nContenido SÍ: Bluey, Daniel Tiger, Sesame Street, Numberblocks\nContenido NO: Videos de unboxing, YouTube autoplay, cambios de escena cada 2-3 seg\n\nSeñales de sobreexposición:\n— Irritabilidad al apagar pantalla\n— Dificultad para concentrarse sin pantalla\n— Pide pantalla como primera opción\n\nFrase: 'Las pantallas son herramienta, no niñera.'" },
+  ];
+  return (
+    <div>
+      <div style={{ marginBottom: 28 }}><span style={{ display: "inline-block", padding: "5px 14px", borderRadius: 50, background: C.lavenderLight, color: "#9B7FC4", fontSize: 12, fontWeight: 600, marginBottom: 12, textTransform: "uppercase" }}>Centro de Bienestar</span><h1 style={{ fontFamily: "'Playfair Display', serif", fontSize: 26, color: C.navy, marginBottom: 4 }}>Padres fuertes, hijos felices</h1><p style={{ fontSize: 14, color: C.muted }}>Recursos de psicólogos infantiles. Actualizados semanalmente.</p></div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        {arts.map((a, i) => (
+          <div key={a.id} style={{ background: "#fff", borderRadius: 16, overflow: "hidden", border: exp===a.id ? "2px solid #9B7FC4" : "2px solid transparent", animation: `fadeInUp 0.4s ease ${i*0.04}s both` }}>
+            <button onClick={() => setExp(exp===a.id ? null : a.id)} style={{ width: "100%", padding: "18px 20px", border: "none", background: "transparent", cursor: "pointer", textAlign: "left", display: "flex", gap: 14, alignItems: "flex-start" }}>
+              <span style={{ fontSize: 26, flexShrink: 0 }}>{a.icon}</span>
+              <div style={{ flex: 1 }}><div style={{ display: "flex", gap: 6, marginBottom: 5, flexWrap: "wrap" }}><span style={{ padding: "2px 9px", borderRadius: 50, fontSize: 10, fontWeight: 600, background: C.lavenderLight, color: "#9B7FC4" }}>{a.cat}</span><span style={{ fontSize: 10, color: C.muted }}>📖 {a.time}</span></div><h3 style={{ fontSize: 15, fontWeight: 700, color: C.navy, lineHeight: 1.4 }}>{a.title}</h3><p style={{ fontSize: 12, color: C.muted, lineHeight: 1.5, marginTop: 3 }}>{a.preview}</p></div>
+              <span style={{ fontSize: 16, color: C.muted, transform: exp===a.id ? "rotate(180deg)" : "rotate(0)", transition: "0.3s" }}>▾</span>
+            </button>
+            {exp===a.id && <div style={{ padding: "0 20px 20px 60px", animation: "fadeIn 0.3s" }}><div style={{ borderTop: `1px solid ${C.sand}`, paddingTop: 16 }}>{a.body.split("\n\n").map((p, pi) => <p key={pi} style={{ fontSize: 14, color: p.startsWith("—") || p.includes(":") ? C.navy : C.charcoal, lineHeight: 1.75, marginBottom: 12, fontWeight: p.length < 40 && !p.startsWith("—") ? 700 : 400 }}>{p}</p>)}</div></div>}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ═══ PLATFORM NEWS ═══
+function PlatformNews() {
+  const [sel, setSel] = useState(null);
+  const articles = [
+    { id:1, tag:"Neurociencia", emoji:"🧬", time:"Hoy", color:C.skyLight, title:"El juego libre restructura las conexiones neuronales", body:"Investigadores de Cambridge confirmaron que 1 hora diaria de juego libre genera mayor densidad de materia gris en la corteza prefrontal.\n\nCuando un niño decide sus propias reglas, negocia y resuelve conflictos, ejercita las habilidades ejecutivas que necesitará toda su vida.\n\nQué hacer hoy: 30-60 min diarios de juego sin dirección adulta. Materiales simples (cajas, telas) son mejores que juguetes con instrucciones." },
+    { id:2, tag:"Tech", emoji:"📱", time:"Ayer", color:C.mintLight, title:"Screen time 2026: los nuevos estudios cambian las reglas", body:"Un metaanálisis en JAMA Pediatrics revisó 87 estudios: el factor determinante no es el tiempo total, sino la calidad y el contexto social.\n\nIntroducen el concepto de 'nutrición digital': Pantalla nutritiva (apps educativas, creación), Pantalla neutra (dibujos de calidad), Pantalla vacía (scroll pasivo).\n\nRecomendación: No cuentes minutos — clasifica actividades digitales y asegura 70%+ nutritiva/neutra." },
+    { id:3, tag:"Nutrición", emoji:"🥑", time:"Hace 2 días", color:`${C.gold}20`, title:"5 snacks que potencian la concentración infantil", body:"El cerebro infantil consume 50% de la energía total del cuerpo.\n\n1. Arándanos + yogur natural — antocianinas + proteínas\n2. Huevos revueltos + tostada integral — colina + carbos complejos\n3. Plátano con mantequilla de maní — triptófano + grasas saludables\n4. Zanahoria + hummus — vitamina A + proteína vegetal\n5. Mix nueces + pasas + chocolate oscuro (4+ años) — omega-3 + hierro + flavonoides\n\nEvitar antes de concentración: jugos procesados, cereales azucarados, ultraprocesados." },
+    { id:4, tag:"Crianza", emoji:"💭", time:"Hace 3 días", color:C.coralLight, title:"El superpoder del aburrimiento", body:"La Dra. Teresa Belton estudió la relación aburrimiento-creatividad por 15 años: los niños aburridos regularmente desarrollan mayor imaginación y resiliencia.\n\nEl aburrimiento obliga al cerebro a generar ideas propias, tolerar incomodidad y buscar soluciones internas.\n\nQué decir cuando dice 'estoy aburrido': En lugar de 'te pongo algo', prueba '¿qué se te ocurre?' Espera. Los primeros 10 min serán incómodos. Luego, la magia sucede." },
+  ];
+  if (sel) { const a = articles.find(x=>x.id===sel); return (<div><button onClick={()=>setSel(null)} style={{ border:"none", background:"transparent", cursor:"pointer", color:C.coral, fontSize:13, fontWeight:600, marginBottom:18, padding:0 }}>← Volver</button><div style={{ background:"#fff", borderRadius:18, padding:28, animation:"fadeInUp 0.4s" }}><span style={{ padding:"4px 10px", borderRadius:50, fontSize:11, fontWeight:600, background:a.color, color:C.navy }}>{a.tag}</span><h1 style={{ fontFamily:"'Playfair Display', serif", fontSize:24, color:C.navy, margin:"14px 0 6px", lineHeight:1.3 }}>{a.title}</h1><span style={{ fontSize:12, color:C.muted }}>{a.time} · KidoVerse Editorial</span><div style={{ marginTop:22 }}>{a.body.split("\n\n").map((p,i) => <p key={i} style={{ fontSize:15, color:C.charcoal, lineHeight:1.8, marginBottom:14 }}>{p}</p>)}</div></div></div>); }
+  return (
+    <div>
+      <div style={{ marginBottom:28 }}><span style={{ display:"inline-block", padding:"5px 14px", borderRadius:50, background:C.mintLight, color:"#5DB89A", fontSize:12, fontWeight:600, marginBottom:12, textTransform:"uppercase" }}>News Feed</span><h1 style={{ fontFamily:"'Playfair Display', serif", fontSize:26, color:C.navy, marginBottom:4 }}>Mantente al día, sin el ruido</h1></div>
+      <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+        {articles.map((a,i) => (<button key={a.id} onClick={()=>setSel(a.id)} style={{ display:"flex", gap:16, padding:20, borderRadius:16, background:"#fff", border:"none", cursor:"pointer", textAlign:"left", transition:"all 0.3s", animation:`fadeInUp 0.4s ease ${i*0.05}s both` }}
+          onMouseOver={e => e.currentTarget.style.transform="translateY(-2px)"} onMouseOut={e => e.currentTarget.style.transform="translateY(0)"}>
+          <div style={{ width:50, height:50, borderRadius:12, background:a.color, display:"flex", alignItems:"center", justifyContent:"center", fontSize:24, flexShrink:0 }}>{a.emoji}</div>
+          <div style={{ flex:1 }}><div style={{ display:"flex", gap:6, marginBottom:5 }}><span style={{ padding:"2px 9px", borderRadius:50, fontSize:10, fontWeight:600, background:a.color, color:C.navy }}>{a.tag}</span><span style={{ fontSize:10, color:C.muted }}>{a.time}</span></div><h3 style={{ fontSize:14, fontWeight:700, color:C.navy, lineHeight:1.4 }}>{a.title}</h3></div>
+          <span style={{ fontSize:16, color:C.muted, alignSelf:"center" }}>→</span>
+        </button>))}
+      </div>
+    </div>
+  );
+}
+
+// ═══ PLATFORM MAPA DE DESARROLLO ═══
+function PlatformMapa() {
+  const [selDim, setSelDim] = useState(null);
+  const dims = [
+    { id:"cog", icon:"🧠", name:"Cognitivo", score:78, trend:"+12%", color:"#5BA4C9", items:["Patrones: Avanzado","Conteo: Dominado","Problemas: En progreso","Memoria: Alto"], tip:"Juega PatternQuest 3x esta semana." },
+    { id:"mot", icon:"🏃", name:"Motor", score:65, trend:"+8%", color:"#5DB89A", items:["Coordinación: En desarrollo","Equilibrio: Promedio","Imitación: Bueno","Fuerza: En progreso"], tip:"Safari Moves + 15 min/día de movimiento libre." },
+    { id:"emo", icon:"💚", name:"Emocional", score:82, trend:"+5%", color:"#9B7FC4", items:["Nombrar emociones: Avanzado","Regulación: En progreso","Empatía: Alto","Expresión verbal: Bueno"], tip:"Sigue con el frasco de emociones cada noche." },
+    { id:"cre", icon:"🎨", name:"Creativo", score:91, trend:"+15%", color:C.coral, items:["Imaginación: Excepcional","Expresión artística: Avanzado","Pensamiento divergente: Alto"], tip:"DreamPaint y CuentaHéroes potencian su punto fuerte." },
+    { id:"soc", icon:"🤝", name:"Social", score:70, trend:"+10%", color:C.gold, items:["Turnos: En desarrollo","Cooperación: Promedio","Conflictos: En progreso","Liderazgo: Emergente"], tip:"Practica la torre cooperativa con amigos." },
+    { id:"len", icon:"📚", name:"Lenguaje", score:85, trend:"+7%", color:"#5BA4C9", items:["Vocabulario: Avanzado","Comprensión: Bueno","Fonética: En desarrollo","Narración: Alto"], tip:"Agrega lectura compartida 15 min/día." },
+  ];
+  const overall = Math.round(dims.reduce((s,d) => s+d.score, 0) / dims.length);
+  return (
+    <div>
+      <div style={{ marginBottom:28 }}><span style={{ display:"inline-block", padding:"5px 14px", borderRadius:50, background:C.skyLight, color:"#5BA4C9", fontSize:12, fontWeight:600, marginBottom:12, textTransform:"uppercase" }}>Mapa de Desarrollo IA</span><h1 style={{ fontFamily:"'Playfair Display', serif", fontSize:26, color:C.navy, marginBottom:4 }}>Progreso de tu hijo</h1></div>
+      <div style={{ background:"#fff", borderRadius:18, padding:24, marginBottom:22, display:"flex", alignItems:"center", gap:22, flexWrap:"wrap", animation:"fadeInUp 0.4s" }}>
+        <div style={{ position:"relative", width:90, height:90, flexShrink:0 }}><svg width="90" height="90" style={{ transform:"rotate(-90deg)" }}><circle cx="45" cy="45" r="38" fill="none" stroke={C.sand} strokeWidth="9" /><circle cx="45" cy="45" r="38" fill="none" stroke={C.coral} strokeWidth="9" strokeDasharray={`${2*Math.PI*38}`} strokeDashoffset={`${2*Math.PI*38*(1-overall/100)}`} strokeLinecap="round" /></svg><span style={{ position:"absolute", top:"50%", left:"50%", transform:"translate(-50%,-50%)", fontSize:26, fontWeight:800, color:C.navy }}>{overall}</span></div>
+        <div><h2 style={{ fontSize:20, fontWeight:700, color:C.navy, marginBottom:3 }}>Puntuación General</h2><p style={{ fontSize:13, color:C.muted }}>Percentil <strong style={{ color:C.coral }}>82</strong> para su edad. Gran progreso en creatividad y lenguaje.</p></div>
+      </div>
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(260px, 1fr))", gap:12 }}>
+        {dims.map((d,i) => (
+          <div key={d.id} onClick={()=>setSelDim(selDim===d.id?null:d.id)} style={{ background:"#fff", borderRadius:14, padding:20, cursor:"pointer", border:selDim===d.id?`2px solid ${d.color}`:"2px solid transparent", transition:"all 0.3s", animation:`fadeInUp 0.4s ease ${i*0.05}s both` }}>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12 }}><div style={{ display:"flex", alignItems:"center", gap:8 }}><span style={{ fontSize:20 }}>{d.icon}</span><span style={{ fontSize:14, fontWeight:700, color:C.navy }}>{d.name}</span></div><div style={{ display:"flex", alignItems:"center", gap:5 }}><span style={{ fontSize:20, fontWeight:800, color:d.color }}>{d.score}</span><span style={{ fontSize:10, color:"#5DB89A", fontWeight:600 }}>{d.trend}</span></div></div>
+            <div style={{ height:7, borderRadius:4, background:C.sand, overflow:"hidden" }}><div style={{ height:"100%", borderRadius:4, background:d.color, width:`${d.score}%`, transition:"width 0.8s" }} /></div>
+            {selDim===d.id && <div style={{ marginTop:14, paddingTop:14, borderTop:`1px solid ${C.sand}`, animation:"fadeIn 0.3s" }}>{d.items.map((it,ii) => <div key={ii} style={{ fontSize:12, color:C.charcoal, marginBottom:6, display:"flex", alignItems:"center", gap:6 }}><span style={{ width:5, height:5, borderRadius:"50%", background:it.includes("Avanzado")||it.includes("Excepcional")?"#5DB89A":it.includes("progreso")?C.gold:d.color, flexShrink:0 }} />{it}</div>)}<div style={{ marginTop:10, padding:10, borderRadius:8, background:`${d.color}12`, fontSize:12, color:d.color, fontWeight:600 }}>💡 {d.tip}</div></div>}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ═══ PLATFORM RETOS FAMILIARES ═══
+function PlatformRetos() {
+  const [activeR, setActiveR] = useState(0);
+  const [done, setDone] = useState({});
+  const toggle = (r,t) => { const k=`${r}-${t}`; setDone(p => ({...p, [k]: !p[k]})); };
+  const retos = [
+    { id:1, week:"Esta semana", status:"active", title:"🏗️ La Gran Construcción Familiar", desc:"Construyan algo con materiales reciclados.", points:150, time:"45 min", tasks:["Recolectar materiales: cajas, cartón, vasos, papel","Cada miembro dibuja un plano","Votar cuál construir","Construir juntos (timer 30 min)","Tomar foto y ponerle nombre","Reflexión: ¿Qué aprendimos en equipo?"], skills:["Equipo","Espacial","Creatividad"], bonus:"🌟 Si la construcción sostiene un libro = +50 pts" },
+    { id:2, week:"Próxima semana", status:"upcoming", title:"🌍 Noche de Cultura", desc:"Elijan un país, cocinen un plato típico, aprendan 5 palabras.", points:200, time:"1-2h", tasks:["El niño elige un país en el mapa","Investigar: bandera, capital, idioma, comida","Cocinar un plato simple del país","Aprender 5 palabras del idioma","Poner música del país durante la cena","Compartir qué fue lo más interesante"], skills:["Cultural","Empatía","Lenguaje"], bonus:"🌟 Si dice las 5 palabras de memoria al día siguiente = +75 pts" },
+    { id:3, week:"En 2 semanas", status:"upcoming", title:"🎭 Teatro en Casa", desc:"Escriban, ensayen y presenten una mini-obra familiar.", points:175, time:"1h", tasks:["Inventar historia con inicio, nudo y desenlace","Asignar personajes","Crear 'disfraces' con ropa de casa","Ensayar 2 veces","Presentar y grabar video","Aplausos para todos"], skills:["Expresión","Creatividad","Confianza"], bonus:"🌟 Si incluyen una canción original = +60 pts" },
+    { id:4, week:"En 3 semanas", status:"upcoming", title:"🔬 Laboratorio Familiar", desc:"3 experimentos caseros locos.", points:175, time:"45 min", tasks:["Volcán de vinagre + bicarbonato","Leche mágica (leche + colorante + detergente)","Huevo que rebota (vinagre 24h)","Predecir qué pasará ANTES","Explicar POR QUÉ pasó","Registrar en cuaderno de científico"], skills:["Método científico","Predicción","Curiosidad"], bonus:"🌟 Si explica un experimento por videollamada = +80 pts" },
+  ];
+  return (
+    <div>
+      <div style={{ marginBottom:28 }}><span style={{ display:"inline-block", padding:"5px 14px", borderRadius:50, background:`${C.gold}25`, color:C.gold, fontSize:12, fontWeight:600, marginBottom:12, textTransform:"uppercase" }}>Retos Familiares</span><h1 style={{ fontFamily:"'Playfair Display', serif", fontSize:26, color:C.navy, marginBottom:4 }}>Cada semana, una aventura</h1></div>
+      <div style={{ background:`linear-gradient(135deg, ${C.navy}, #1a3a4a)`, borderRadius:16, padding:22, marginBottom:22, display:"flex", justifyContent:"space-around", flexWrap:"wrap", gap:14 }}>
+        {[{l:"Puntos",v:"425 ⭐"},{l:"Completados",v:"3 ✅"},{l:"Racha",v:"2 🔥"},{l:"Ranking",v:"#847 🏆"}].map((s,i) => <div key={i} style={{ textAlign:"center" }}><div style={{ fontSize:20, fontWeight:800, color:"#fff" }}>{s.v}</div><div style={{ fontSize:11, color:"rgba(255,255,255,0.5)", marginTop:2 }}>{s.l}</div></div>)}
+      </div>
+      <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+        {retos.map((r,i) => (
+          <div key={r.id} style={{ background:"#fff", borderRadius:16, overflow:"hidden", border:activeR===i?`2px solid ${C.gold}`:"2px solid transparent", animation:`fadeInUp 0.4s ease ${i*0.05}s both` }}>
+            <button onClick={()=>setActiveR(activeR===i?-1:i)} style={{ width:"100%", padding:20, border:"none", background:"transparent", cursor:"pointer", textAlign:"left" }}>
+              <div style={{ display:"flex", gap:8, marginBottom:6, flexWrap:"wrap" }}><span style={{ padding:"3px 9px", borderRadius:50, fontSize:10, fontWeight:600, background:r.status==="active"?"#d4edda":C.sand, color:r.status==="active"?"#28a745":C.muted }}>{r.status==="active"?"🟢 Activo":r.week}</span><span style={{ fontSize:10, color:C.muted }}>⏱ {r.time}</span><span style={{ fontSize:10, color:C.gold, fontWeight:700 }}>+{r.points} pts</span></div>
+              <h3 style={{ fontSize:16, fontWeight:700, color:C.navy }}>{r.title}</h3><p style={{ fontSize:13, color:C.muted, marginTop:3 }}>{r.desc}</p>
+            </button>
+            {activeR===i && <div style={{ padding:"0 20px 20px", animation:"fadeIn 0.3s" }}><div style={{ borderTop:`1px solid ${C.sand}`, paddingTop:16 }}>
+              {r.tasks.map((task,ti) => { const isDone = done[`${r.id}-${ti}`]; return (
+                <button key={ti} onClick={()=>toggle(r.id,ti)} style={{ display:"flex", alignItems:"center", gap:10, padding:"9px 12px", borderRadius:9, background:isDone?`${C.sage}15`:C.cream, marginBottom:7, border:"none", cursor:"pointer", width:"100%", textAlign:"left" }}>
+                  <div style={{ width:20, height:20, borderRadius:5, border:isDone?"none":`2px solid ${C.sage}`, background:isDone?C.sage:"transparent", display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontSize:11, flexShrink:0 }}>{isDone&&"✓"}</div>
+                  <span style={{ fontSize:13, color:isDone?C.sageDark:C.charcoal, textDecoration:isDone?"line-through":"none" }}>{task}</span>
+                </button>
+              );})}
+              <div style={{ marginTop:12, padding:12, borderRadius:9, background:`${C.gold}12`, fontSize:12, color:C.gold, fontWeight:600 }}>{r.bonus}</div>
+              <div style={{ display:"flex", gap:5, marginTop:12, flexWrap:"wrap" }}>{r.skills.map(s => <span key={s} style={{ padding:"3px 9px", borderRadius:50, fontSize:10, background:C.skyLight, color:"#5BA4C9" }}>{s}</span>)}</div>
+            </div></div>}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ═══ PLATFORM PSICÓLOGO ═══
+function PlatformPsicologo() {
+  const [step, setStep] = useState(0); const [psy, setPsy] = useState(null); const [date, setDate] = useState(null); const [time, setTime] = useState(null); const [booked, setBooked] = useState(false);
+  const psys = [
+    { id:1, name:"Dra. Carolina Muñoz", spec:"Psicóloga Infantil", exp:"12 años", focus:"Regulación emocional, rabietas", avatar:"CM", rating:"4.9" },
+    { id:2, name:"Dr. Martín Reyes", spec:"Psicólogo Familiar", exp:"8 años", focus:"Burnout parental, crianza positiva", avatar:"MR", rating:"4.8" },
+    { id:3, name:"Dra. Valentina Soto", spec:"Neuropsicóloga", exp:"10 años", focus:"Desarrollo cognitivo, TDAH", avatar:"VS", rating:"4.9" },
+  ];
+  const dates = []; const today = new Date(); for (let i=1;i<=7;i++) { const d=new Date(today); d.setDate(today.getDate()+i); if(d.getDay()!==0) dates.push(d.toLocaleDateString("es-CL",{weekday:"short",day:"numeric",month:"short"})); }
+  const times = ["09:00","10:00","11:00","14:00","15:00","16:00","17:00"];
+
+  if (booked) return (
+    <div style={{ textAlign:"center", padding:"40px 20px", animation:"fadeInUp 0.5s" }}>
+      <div style={{ fontSize:56, marginBottom:14 }}>✅</div>
+      <h2 style={{ fontFamily:"'Playfair Display', serif", fontSize:24, color:C.navy, marginBottom:6 }}>¡Sesión agendada!</h2>
+      <p style={{ fontSize:15, color:C.muted }}>{psys.find(p=>p.id===psy)?.name}</p>
+      <p style={{ fontSize:15, color:C.muted }}>{dates[date]} a las {time} · 30 min · $20 USD</p>
+      <a href="https://buy.stripe.com/test_dRmcN5gie9Cb45ie1EenS01" target="_blank" rel="noopener" style={{ display:"inline-block", marginTop:24, padding:"14px 32px", borderRadius:50, background:`linear-gradient(135deg, ${C.coral}, ${C.gold})`, color:"#fff", fontSize:15, fontWeight:700, textDecoration:"none", boxShadow:"0 4px 20px rgba(232,131,107,0.3)" }}>Confirmar y Pagar $20 USD →</a>
+      <p style={{ fontSize:11, color:C.muted, marginTop:10 }}>Cancela hasta 12h antes sin costo</p>
+    </div>
+  );
+
+  return (
+    <div>
+      <div style={{ marginBottom:28 }}><span style={{ display:"inline-block", padding:"5px 14px", borderRadius:50, background:C.coralLight, color:C.coral, fontSize:12, fontWeight:600, marginBottom:12, textTransform:"uppercase" }}>Sesión con Psicólogo</span><h1 style={{ fontFamily:"'Playfair Display', serif", fontSize:26, color:C.navy, marginBottom:4 }}>Tu bienestar también importa</h1><p style={{ fontSize:14, color:C.muted }}>30 minutos por Zoom. $20 USD.</p></div>
+
+      {step===0 && <div style={{ animation:"fadeInUp 0.4s" }}><h2 style={{ fontSize:18, fontWeight:700, color:C.navy, marginBottom:14 }}>Tipo de consulta:</h2>{[{id:"child",ic:"👶",t:"Sobre mi hijo/a",d:"Comportamiento, emociones, desarrollo"},{id:"parent",ic:"💆",t:"Para mí (padre/madre)",d:"Burnout, ansiedad, crianza"},{id:"family",ic:"👨‍👩‍👧",t:"Familiar",d:"Dinámicas, conflictos, transiciones"}].map(ct => <button key={ct.id} onClick={()=>setStep(1)} style={{ display:"flex", gap:14, padding:18, borderRadius:14, border:"none", background:"#fff", cursor:"pointer", textAlign:"left", width:"100%", marginBottom:10, transition:"all 0.3s" }} onMouseOver={e=>e.currentTarget.style.transform="translateY(-2px)"} onMouseOut={e=>e.currentTarget.style.transform="translateY(0)"}><span style={{ fontSize:28 }}>{ct.ic}</span><div style={{ flex:1 }}><h3 style={{ fontSize:15, fontWeight:700, color:C.navy }}>{ct.t}</h3><p style={{ fontSize:12, color:C.muted }}>{ct.d}</p></div><span style={{ fontSize:18, fontWeight:800, color:C.coral, alignSelf:"center" }}>$20</span></button>)}</div>}
+
+      {step===1 && <div style={{ animation:"fadeInUp 0.4s" }}><button onClick={()=>setStep(0)} style={{ border:"none", background:"transparent", cursor:"pointer", color:C.coral, fontSize:12, fontWeight:600, marginBottom:14, padding:0 }}>← Atrás</button><h2 style={{ fontSize:18, fontWeight:700, color:C.navy, marginBottom:14 }}>Elige profesional:</h2>{psys.map(p => <button key={p.id} onClick={()=>{setPsy(p.id);setStep(2);}} style={{ display:"flex", gap:14, padding:18, borderRadius:14, border:"none", background:"#fff", cursor:"pointer", textAlign:"left", width:"100%", marginBottom:10 }}><div style={{ width:44, height:44, borderRadius:50, background:`linear-gradient(135deg, ${C.coral}, ${C.gold})`, display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontSize:14, fontWeight:700, flexShrink:0 }}>{p.avatar}</div><div style={{ flex:1 }}><h3 style={{ fontSize:15, fontWeight:700, color:C.navy }}>{p.name}</h3><p style={{ fontSize:12, color:C.coral }}>{p.spec} · {p.exp}</p><p style={{ fontSize:12, color:C.muted, marginTop:2 }}>{p.focus}</p></div><span style={{ fontSize:12, color:C.gold, fontWeight:700, alignSelf:"center" }}>⭐ {p.rating}</span></button>)}</div>}
+
+      {step===2 && <div style={{ animation:"fadeInUp 0.4s" }}><button onClick={()=>setStep(1)} style={{ border:"none", background:"transparent", cursor:"pointer", color:C.coral, fontSize:12, fontWeight:600, marginBottom:14, padding:0 }}>← Atrás</button><h2 style={{ fontSize:18, fontWeight:700, color:C.navy, marginBottom:12 }}>Fecha:</h2><div style={{ display:"flex", gap:7, flexWrap:"wrap", marginBottom:18 }}>{dates.map((d,i) => <button key={i} onClick={()=>setDate(i)} style={{ padding:"9px 14px", borderRadius:10, border:"none", background:date===i?C.navy:"#fff", color:date===i?"#fff":C.charcoal, fontSize:12, fontWeight:date===i?700:500, cursor:"pointer" }}>{d}</button>)}</div>{date!==null&&<><h2 style={{ fontSize:18, fontWeight:700, color:C.navy, marginBottom:12 }}>Hora:</h2><div style={{ display:"flex", gap:7, flexWrap:"wrap", marginBottom:22 }}>{times.map(t=><button key={t} onClick={()=>setTime(t)} style={{ padding:"9px 16px", borderRadius:9, border:"none", background:time===t?C.navy:"#fff", color:time===t?"#fff":C.charcoal, fontSize:13, fontWeight:time===t?700:500, cursor:"pointer" }}>{t}</button>)}</div></>}{time&&<button onClick={()=>setBooked(true)} style={{ width:"100%", padding:14, borderRadius:50, border:"none", background:`linear-gradient(135deg, ${C.coral}, ${C.gold})`, color:"#fff", fontSize:15, fontWeight:700, cursor:"pointer", boxShadow:"0 4px 20px rgba(232,131,107,0.3)" }}>Agendar — $20 USD →</button>}</div>}
+    </div>
+  );
+}
+
+// ═══ PLATFORM KIDOTUBE ═══
+function PlatformKidoTube() {
+  const [filter, setFilter] = useState("all");
+  const shows = [
+    { title:"Bluey", videoId:"qlCaXrifzoY", age:"3-8", grp:"pre", rating:"9.8", badge:"#1 Expertos", bc:"#FFD700", tags:["Juego","Vínculos"], desc:"Gold standard. Resolución de conflictos y juego libre.", cat:C.skyLight },
+    { title:"Daniel Tiger", videoId:"bruLsEPKbwM", age:"2-5", grp:"baby", rating:"9.6", badge:"Psicólogos", bc:"#9B7FC4", tags:["Emociones","Canciones"], desc:"Canciones para manejar emociones grandes.", cat:C.lavenderLight },
+    { title:"Peppa Pig", videoId:"5pRiqWjeiI8", age:"2-5", grp:"baby", rating:"9.2", badge:"Clásico", bc:C.coral, tags:["Modales","Compartir"], desc:"Episodios de 5 min, estilo que evita sobreestimulación.", cat:C.coralLight },
+    { title:"Sesame Street", videoId:"Gy3Nh0MdEys", age:"2-6", grp:"baby", rating:"9.7", badge:"Legendario", bc:"#5DB89A", tags:["Letras","Diversidad"], desc:"50+ años de investigación educativa.", cat:C.mintLight },
+    { title:"Numberblocks", videoId:"Epkwg4hDf5M", age:"3-6", grp:"pre", rating:"9.5", badge:"STEM", bc:"#5BA4C9", tags:["Matemáticas","Patrones"], desc:"La mejor intro a matemáticas.", cat:C.skyLight },
+    { title:"Wild Kratts", videoId:"BrTGLiWw5eg", age:"5-8", grp:"reader", rating:"9.3", badge:"Ciencia", bc:"#5DB89A", tags:["Animales","Naturaleza"], desc:"Biología con aventura.", cat:C.mintLight },
+    { title:"Puffin Rock", videoId:"zB31dMKFRKc", age:"2-5", grp:"baby", rating:"9.1", badge:"Calmante", bc:C.sage, tags:["Naturaleza","Calma"], desc:"Ritmo suave. Ideal para antes de dormir.", cat:`${C.sage}20` },
+    { title:"StoryBots", videoId:"KpBp0sdalNw", age:"4-8", grp:"reader", rating:"9.4", badge:"Emmy", bc:C.gold, tags:["Preguntas","Ciencia"], desc:"Responde las grandes preguntas con humor.", cat:`${C.gold}20` },
+  ];
+  const filtered = filter === "all" ? shows : shows.filter(s => s.grp === filter);
+  return (
+    <div>
+      <div style={{ marginBottom:24 }}><span style={{ display:"inline-block", padding:"5px 14px", borderRadius:50, background:"#FFE4E4", color:"#FF4444", fontSize:12, fontWeight:600, marginBottom:12, textTransform:"uppercase" }}>▶ KidoTube</span><h1 style={{ fontFamily:"'Playfair Display', serif", fontSize:26, color:C.navy, marginBottom:4 }}>YouTube sin preocupaciones</h1></div>
+      <div style={{ display:"flex", gap:7, marginBottom:22, flexWrap:"wrap" }}>{[{id:"all",l:"Todos"},{id:"baby",l:"2-3"},{id:"pre",l:"3-5"},{id:"reader",l:"5-8"}].map(f => <button key={f.id} onClick={()=>setFilter(f.id)} style={{ padding:"7px 14px", borderRadius:50, border:"none", fontSize:12, fontWeight:filter===f.id?600:500, background:filter===f.id?C.navy:"#fff", color:filter===f.id?"#fff":C.muted, cursor:"pointer" }}>{f.l}</button>)}</div>
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(260px, 1fr))", gap:14 }}>
+        {filtered.map((s,i) => (
+          <div key={i} onClick={()=>window.open(`https://www.youtube.com/watch?v=${s.videoId}`,'_blank')} style={{ background:"#fff", borderRadius:14, overflow:"hidden", cursor:"pointer", transition:"all 0.3s", animation:`fadeInUp 0.4s ease ${i*0.04}s both` }}
+            onMouseOver={e=>{e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow="0 6px 20px rgba(0,0,0,0.07)";}} onMouseOut={e=>{e.currentTarget.style.transform="translateY(0)";e.currentTarget.style.boxShadow="none";}}>
+            <div style={{ position:"relative", paddingBottom:"56.25%", background:"#000" }}>
+              <img src={`https://img.youtube.com/vi/${s.videoId}/hqdefault.jpg`} alt={s.title} style={{ position:"absolute", top:0, left:0, width:"100%", height:"100%", objectFit:"cover" }} />
+              <div style={{ position:"absolute", top:"50%", left:"50%", transform:"translate(-50%,-50%)", width:44, height:44, borderRadius:"50%", background:"rgba(255,0,0,0.9)", display:"flex", alignItems:"center", justifyContent:"center" }}><div style={{ width:0, height:0, borderTop:"7px solid transparent", borderBottom:"7px solid transparent", borderLeft:"13px solid #fff", marginLeft:2 }} /></div>
+              <span style={{ position:"absolute", top:7, left:7, padding:"2px 7px", borderRadius:4, background:s.bc, color:"#fff", fontSize:9, fontWeight:800, textTransform:"uppercase" }}>{s.badge}</span>
+              <span style={{ position:"absolute", top:7, right:7, padding:"2px 7px", borderRadius:4, background:"rgba(0,0,0,0.7)", color:"#fff", fontSize:9 }}>{s.age}</span>
+            </div>
+            <div style={{ padding:14 }}><div style={{ display:"flex", justifyContent:"space-between", marginBottom:5 }}><h3 style={{ fontSize:14, fontWeight:700, color:C.navy }}>{s.title}</h3><span style={{ fontSize:11, fontWeight:700, color:C.gold }}>⭐ {s.rating}</span></div><p style={{ fontSize:11, color:C.muted, lineHeight:1.5, marginBottom:6 }}>{s.desc}</p><div style={{ display:"flex", gap:4, flexWrap:"wrap" }}>{s.tags.map(t => <span key={t} style={{ padding:"2px 7px", borderRadius:50, fontSize:9, background:s.cat, color:C.charcoal }}>#{t}</span>)}</div></div>
+          </div>
+        ))}
+      </div>
+      <div style={{ marginTop:20, padding:16, borderRadius:12, background:C.mintLight, display:"flex", alignItems:"center", gap:10 }}><span style={{ fontSize:22 }}>🛡️</span><p style={{ fontSize:12, color:C.navy }}><strong>Curado por expertos.</strong> Cada show evaluado en ritmo, valores y beneficio educativo.</p></div>
+    </div>
+  );
+}
+
+
+// ═══ MAIN APP ROUTER ═══
+export default function App() {
+  const [view, setView] = useState("landing");
+
+  if (view === "landing") {
+    return <Landing onPlayGames={() => setView("platform")} />;
+  }
+
+  if (view === "platform") {
+    return <Platform />;
+  }
+
+  return <Landing onPlayGames={() => setView("platform")} />;
+}

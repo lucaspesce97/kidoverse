@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>KidoVerse — Donde jugar es crecer</title>
+    <meta name="description" content="Juegos con IA, YouTube curado por expertos, bienestar familiar y contenido pedagógico para niños de 2 a 8 años. Desde $6/mes. Prueba 3 días gratis." />
+    <meta property="og:title" content="KidoVerse — Donde jugar es crecer" />
+    <meta property="og:description" content="La plataforma #1 para padres que quieren más. Juegos con IA, bienestar familiar y contenido experto." />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://kidoverse.co" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="KidoVerse — Donde jugar es crecer" />
+    <meta name="twitter:description" content="Juegos con IA + YouTube curado + bienestar parental. Todo por $6/mes." />
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧒</text></svg>" />
+  </head>
+  <body style="margin: 0; padding: 0;">
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
